@@ -1,10 +1,11 @@
-from flask import Flask, request, redirect, render_template_string
+from flask import Flask, request, redirect, render_template_string, session, url_for
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
 
 app = Flask(__name__)
+app.secret_key = os.environ["SECRET_KEY"]
 
 class Banco:
     def __init__(self):
@@ -294,6 +295,118 @@ label {
 </body>
 </html>
 """
+
+
+LOGIN_HTML = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - Sistema de Recebimento</title>
+<style>
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+.login {
+    background: white;
+    width: 90%;
+    max-width: 400px;
+    padding: 30px;
+    border-radius: 14px;
+    box-shadow: 0 5px 25px rgba(0,0,0,.10);
+}
+h1 {
+    margin-top: 0;
+    text-align: center;
+    color: #111827;
+}
+p {
+    text-align: center;
+    color: #6b7280;
+}
+input {
+    width: 100%;
+    padding: 14px;
+    margin: 8px 0;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 16px;
+}
+button {
+    width: 100%;
+    padding: 14px;
+    margin-top: 10px;
+    border: 0;
+    border-radius: 8px;
+    background: #111827;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+}
+.erro {
+    color: #dc2626;
+    font-weight: bold;
+}
+</style>
+</head>
+<body>
+<div class="login">
+    <h1>Sistema de Recebimento</h1>
+    <p>Entre para continuar</p>
+
+    {% if erro %}
+    <p class="erro">{{ erro }}</p>
+    {% endif %}
+
+    <form method="POST">
+        <input name="usuario" placeholder="Usuário" required>
+        <input name="senha" type="password" placeholder="Senha" required>
+        <button type="submit">ENTRAR</button>
+    </form>
+</div>
+</body>
+</html>
+"""
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    erro = None
+
+    if request.method == "POST":
+        usuario = request.form.get("usuario", "")
+        senha = request.form.get("senha", "")
+
+        if (
+            usuario == os.environ.get("LOGIN_USER")
+            and senha == os.environ.get("LOGIN_PASSWORD")
+        ):
+            session["logado"] = True
+            return redirect(url_for("inicio"))
+
+        erro = "Usuário ou senha inválidos."
+
+    return render_template_string(LOGIN_HTML, erro=erro)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.before_request
+def exigir_login():
+    if request.endpoint not in ("login", "static") and not session.get("logado"):
+        return redirect(url_for("login"))
+
 
 @app.route("/")
 def inicio():
