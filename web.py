@@ -3,6 +3,7 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = os.environ["SECRET_KEY"]
@@ -28,6 +29,7 @@ def conectar():
 
 def criar_banco():
     banco = conectar()
+
     banco.execute("""
         CREATE TABLE IF NOT EXISTS recebimentos (
             id SERIAL PRIMARY KEY,
@@ -37,11 +39,41 @@ def criar_banco():
             funcionario TEXT,
             observacao TEXT,
             data TEXT NOT NULL,
-            hora TEXT NOT NULL
+            nota TEXT NOT NULL
         )
     """)
+
+    banco.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id SERIAL PRIMARY KEY,
+            usuario TEXT UNIQUE NOT NULL,
+            senha TEXT NOT NULL,
+            nivel TEXT NOT NULL DEFAULT 'funcionario'
+        )
+    """)
+
+    admin_user = os.environ.get("LOGIN_USER")
+    admin_password = os.environ.get("LOGIN_PASSWORD")
+
+    if admin_user and admin_password:
+        existente = banco.execute(
+            "SELECT id FROM usuarios WHERE usuario = ?",
+            (admin_user,)
+        ).fetchone()
+
+        if not existente:
+            banco.execute(
+                "INSERT INTO usuarios (usuario, senha, nivel) VALUES (?, ?, ?)",
+                (
+                    admin_user,
+                    generate_password_hash(admin_password),
+                    "admin"
+                )
+            )
+
     banco.commit()
     banco.close()
+
 
 HTML = """
 <!DOCTYPE html>
@@ -152,6 +184,16 @@ label {
 <div class="topo">
     <div class="container">
         <h1>Controle de Recebimentos</h1>
+
+{% if session.get("nivel") == "admin" %}
+<a href="/usuarios"
+   style="display:block;text-align:center;background:#111827;color:white;
+   padding:12px;border-radius:8px;text-decoration:none;margin-bottom:18px;
+   font-weight:bold;">
+    GERENCIAR USUÁRIOS
+</a>
+{% endif %}
+
         <p>Registro e acompanhamento de entregas</p>
     </div>
 </div>
@@ -384,11 +426,18 @@ def login():
         usuario = request.form.get("usuario", "")
         senha = request.form.get("senha", "")
 
-        if (
-            usuario == os.environ.get("LOGIN_USER")
-            and senha == os.environ.get("LOGIN_PASSWORD")
-        ):
+        banco = conectar()
+        registro = banco.execute(
+            "SELECT id, usuario, senha, nivel FROM usuarios WHERE usuario = ?",
+            (usuario,)
+        ).fetchone()
+        banco.close()
+
+        if registro and check_password_hash(registro["senha"], senha):
             session["logado"] = True
+            session["usuario_id"] = registro["id"]
+            session["usuario"] = registro["usuario"]
+            session["nivel"] = registro["nivel"]
             return redirect(url_for("inicio"))
 
         erro = "Usuário ou senha inválidos."
@@ -406,6 +455,119 @@ def logout():
 def exigir_login():
     if request.endpoint not in ("login", "static") and not session.get("logado"):
         return redirect(url_for("login"))
+
+
+
+USUARIOS_HTML = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerenciar usuários</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f3f4f6;
+    margin: 0;
+    padding: 20px;
+}
+.caixa {
+    max-width: 700px;
+    margin: auto;
+    background: white;
+    padding: 24px;
+    border-radius: 14px;
+}
+input, select, button {
+    width: 100%;
+    padding: 12px;
+    margin: 7px 0;
+    box-sizing: border-box;
+}
+button {
+    background: #111827;
+    color: white;
+    border: 0;
+    border-radius: 8px;
+    font-weight: bold;
+}
+.usuario {
+    border-top: 1px solid #ddd;
+    padding: 12px 0;
+}
+a {
+    color: #111827;
+}
+</style>
+</head>
+<body>
+<div class="caixa">
+    <h1>Gerenciar usuários</h1>
+
+    <form method="POST">
+        <input name="usuario" placeholder="Novo usuário" required>
+        <input name="senha" type="password" placeholder="Senha" required>
+
+        <select name="nivel">
+            <option value="funcionario">Funcionário</option>
+            <option value="admin">Administrador</option>
+        </select>
+
+        <button type="submit">CRIAR USUÁRIO</button>
+    </form>
+
+    <h2>Usuários cadastrados</h2>
+
+    {% for u in usuarios %}
+    <div class="usuario">
+        <strong>{{ u["usuario"] }}</strong>
+        — {{ u["nivel"] }}
+    </div>
+    {% endfor %}
+
+    <p><a href="/">Voltar ao sistema</a></p>
+</div>
+</body>
+</html>
+"""
+
+@app.route("/usuarios", methods=["GET", "POST"])
+def usuarios():
+    if session.get("nivel") != "admin":
+        return redirect(url_for("inicio"))
+
+    banco = conectar()
+
+    if request.method == "POST":
+        usuario = request.form.get("usuario", "").strip()
+        senha = request.form.get("senha", "")
+        nivel = request.form.get("nivel", "funcionario")
+
+        if usuario and senha and nivel in ("admin", "funcionario"):
+            existente = banco.execute(
+                "SELECT id FROM usuarios WHERE usuario = ?",
+                (usuario,)
+            ).fetchone()
+
+            if not existente:
+                banco.execute(
+                    "INSERT INTO usuarios (usuario, senha, nivel) VALUES (?, ?, ?)",
+                    (
+                        usuario,
+                        generate_password_hash(senha),
+                        nivel
+                    )
+                )
+                banco.commit()
+
+    lista = banco.execute(
+        "SELECT id, usuario, nivel FROM usuarios ORDER BY usuario"
+    ).fetchall()
+
+    banco.close()
+
+    return render_template_string(USUARIOS_HTML, usuarios=lista)
 
 
 @app.route("/")
