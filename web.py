@@ -377,8 +377,9 @@ def excluir(id):
     return redirect("/")
 
 
+criar_banco()
+
 if __name__ == "__main__":
-    criar_banco()
 
     app.run(
         host="0.0.0.0",
