@@ -1,19 +1,35 @@
 from flask import Flask, request, redirect, render_template_string
-import sqlite3
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from datetime import datetime
 
 app = Flask(__name__)
 
+class Banco:
+    def __init__(self):
+        self.conn = psycopg2.connect(os.environ["DATABASE_URL"])
+        self.cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+
+    def execute(self, sql, params=()):
+        self.cursor.execute(sql.replace("?", "%s"), params)
+        return self.cursor
+
+    def commit(self):
+        self.conn.commit()
+
+    def close(self):
+        self.cursor.close()
+        self.conn.close()
+
 def conectar():
-    banco = sqlite3.connect("recebimentos.db")
-    banco.row_factory = sqlite3.Row
-    return banco
+    return Banco()
 
 def criar_banco():
     banco = conectar()
     banco.execute("""
         CREATE TABLE IF NOT EXISTS recebimentos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             fornecedor TEXT NOT NULL,
             nota_fiscal TEXT,
             volumes INTEGER,
