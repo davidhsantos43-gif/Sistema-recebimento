@@ -606,8 +606,8 @@ def inicio():
         registros = banco.execute("""
             SELECT *
             FROM recebimentos
-            WHERE fornecedor LIKE ?
-               OR nota_fiscal LIKE ?
+            WHERE fornecedor ILIKE ?
+               OR nota_fiscal ILIKE ?
             ORDER BY id DESC
         """, (
             f"%{pesquisa}%",
