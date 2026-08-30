@@ -440,6 +440,14 @@ label {
 
                     {% if session.get("nivel") == "admin" %}
                     <a
+                        href="/editar/{{ r['id'] }}"
+                        style="display:inline-block;margin-right:14px;
+                        color:#111827;text-decoration:none;font-weight:bold;"
+                    >
+                        Editar registro
+                    </a>
+
+                    <a
                         class="excluir"
                         href="/excluir/{{ r['id'] }}"
                         onclick="return confirm('Excluir este recebimento?')"
@@ -1009,6 +1017,282 @@ def registrar():
 
     return redirect("/")
 
+
+
+
+EDITAR_HTML = """
+
+<!DOCTYPE html>
+
+<html lang="pt-BR">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Editar recebimento</title>
+
+<style>
+
+* { box-sizing: border-box; }
+
+body {
+
+    margin: 0;
+
+    padding: 20px;
+
+    background: #f3f4f6;
+
+    font-family: Arial, sans-serif;
+
+    color: #111827;
+
+}
+
+.caixa {
+
+    max-width: 700px;
+
+    margin: auto;
+
+    background: white;
+
+    padding: 24px;
+
+    border-radius: 14px;
+
+}
+
+label {
+
+    display: block;
+
+    font-weight: bold;
+
+    margin-top: 16px;
+
+    margin-bottom: 6px;
+
+}
+
+input, textarea, button {
+
+    width: 100%;
+
+    padding: 13px;
+
+    border-radius: 9px;
+
+    font-size: 16px;
+
+}
+
+input, textarea {
+
+    border: 1px solid #d1d5db;
+
+}
+
+textarea {
+
+    min-height: 110px;
+
+}
+
+button {
+
+    margin-top: 20px;
+
+    border: 0;
+
+    background: #111827;
+
+    color: white;
+
+    font-weight: bold;
+
+}
+
+.info {
+
+    margin-top: 18px;
+
+    padding: 12px;
+
+    background: #f3f4f6;
+
+    border-radius: 9px;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="caixa">
+
+    <h1>Editar recebimento</h1>
+
+    <form method="POST">
+
+        <label>Fornecedor</label>
+
+        <input
+
+            name="fornecedor"
+
+            value="{{ registro['fornecedor'] }}"
+
+            required
+
+        >
+
+        <label>Nota fiscal</label>
+
+        <input
+
+            name="nota_fiscal"
+
+            value="{{ registro['nota_fiscal'] or '' }}"
+
+            inputmode="numeric"
+
+            pattern="[0-9]*"
+
+        >
+
+        <label>Quantidade de volumes</label>
+
+        <input
+
+            type="number"
+
+            name="volumes"
+
+            value="{{ registro['volumes'] or '' }}"
+
+            min="0"
+
+            inputmode="numeric"
+
+        >
+
+        <label>Observação</label>
+
+        <textarea name="observacao">{{ registro['observacao'] or '' }}</textarea>
+
+        <div class="info">
+
+            <strong>Recebido por:</strong> {{ registro['funcionario'] }}<br>
+
+            <strong>Data:</strong> {{ registro['data'] }} às {{ registro['hora'] }}
+
+        </div>
+
+        <button type="submit">SALVAR ALTERAÇÕES</button>
+
+    </form>
+
+    <p><a href="/">Voltar ao sistema</a></p>
+
+</div>
+
+</body>
+
+</html>
+
+"""
+
+@app.route("/editar/<int:id>", methods=["GET", "POST"])
+
+def editar_recebimento(id):
+
+    if session.get("nivel") != "admin":
+
+        return redirect(url_for("inicio"))
+
+    banco = conectar()
+
+    registro = banco.execute(
+
+        "SELECT * FROM recebimentos WHERE id = ?",
+
+        (id,)
+
+    ).fetchone()
+
+    if not registro:
+
+        banco.close()
+
+        return redirect(url_for("inicio"))
+
+    if request.method == "POST":
+
+        fornecedor = request.form.get("fornecedor", "").strip()
+
+        nota_fiscal = request.form.get("nota_fiscal", "").strip()
+
+        observacao = request.form.get("observacao", "").strip()
+
+        volumes_txt = request.form.get("volumes", "").strip()
+
+        volumes = int(volumes_txt) if volumes_txt else None
+
+        banco.execute(
+
+            """
+
+            UPDATE recebimentos
+
+            SET fornecedor = ?,
+
+                nota_fiscal = ?,
+
+                volumes = ?,
+
+                observacao = ?
+
+            WHERE id = ?
+
+            """,
+
+            (
+
+                fornecedor,
+
+                nota_fiscal,
+
+                volumes,
+
+                observacao,
+
+                id
+
+            )
+
+        )
+
+        banco.commit()
+
+        banco.close()
+
+        return redirect(url_for("inicio"))
+
+    banco.close()
+
+    return render_template_string(
+
+        EDITAR_HTML,
+
+        registro=registro
+
+    )
 
 @app.route("/excluir/<int:id>")
 def excluir(id):
