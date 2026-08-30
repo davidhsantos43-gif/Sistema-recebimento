@@ -243,8 +243,9 @@ label {
             <label>Funcionário que recebeu</label>
             <input
                 name="funcionario"
-                placeholder="Nome do funcionário"
-            >
+                        value="{{ session.get('usuario', '') }}"
+                        readonly
+                    >
 
             <label>Observação</label>
             <textarea
@@ -631,7 +632,7 @@ def inicio():
 def registrar():
     fornecedor = request.form["fornecedor"].strip()
     nota_fiscal = request.form["nota_fiscal"].strip()
-    funcionario = request.form["funcionario"].strip()
+    funcionario = session.get("usuario", "")
     observacao = request.form["observacao"].strip()
 
     volumes = request.form["volumes"].strip()
