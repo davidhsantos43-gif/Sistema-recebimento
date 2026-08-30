@@ -52,6 +52,61 @@ def criar_banco():
         )
     """)
 
+    banco.execute("""
+        CREATE TABLE IF NOT EXISTS sugestoes_observacao (
+            id SERIAL PRIMARY KEY,
+            texto TEXT UNIQUE NOT NULL,
+            ativo INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+
+    sugestoes_padrao = [
+        "Tudo certo",
+        "Faltaram peças",
+        "Vieram peças a mais",
+        "Produto avariado",
+        "Produto quebrado",
+        "Produto amassado",
+        "Produto riscado",
+        "Produto molhado",
+        "Produto errado",
+        "Quantidade divergente",
+        "Item faltando",
+        "Item duplicado",
+        "Volume faltante",
+        "Volume excedente",
+        "Entrega parcial",
+        "Embalagem danificada",
+        "Embalagem aberta",
+        "Caixa amassada",
+        "Caixa rasgada",
+        "Caixa molhada",
+        "Caixa violada",
+        "Lacre violado",
+        "Nota fiscal divergente",
+        "Sem nota fiscal",
+        "Nota fiscal não encontrada",
+        "Lote divergente",
+        "Validade curta",
+        "Validade vencida",
+        "Mercadoria recusada",
+        "Mercadoria devolvida",
+        "Aguardando conferência",
+        "Aguardando reposição",
+        "Aguardando contato com fornecedor",
+        "Recebimento com ressalva"
+    ]
+
+    for sugestao in sugestoes_padrao:
+        banco.execute(
+            """
+            INSERT INTO sugestoes_observacao (texto, ativo)
+            VALUES (?, 1)
+            ON CONFLICT (texto) DO NOTHING
+            """,
+            (sugestao,)
+        )
+
     admin_user = os.environ.get("LOGIN_USER")
     admin_password = os.environ.get("LOGIN_PASSWORD")
 
@@ -200,6 +255,18 @@ label {
    box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
     GERENCIAR USUÁRIOS
 </a>
+
+<a href="/observacoes"
+   style="display:flex;align-items:center;justify-content:center;
+   width:100%;min-height:54px;
+   background:#111827;color:white;
+   padding:14px 18px;border-radius:9px;
+   text-decoration:none;margin:0 0 22px;
+   font-weight:bold;font-size:16px;
+   border:1px solid rgba(255,255,255,.18);
+   box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
+    GERENCIAR OBSERVAÇÕES
+</a>
 {% endif %}
 
         <p>Registro e acompanhamento de entregas</p>
@@ -255,6 +322,52 @@ label {
                 name="observacao"
                 placeholder="Avarias, falta de volumes ou observações..."
             ></textarea>
+
+            <div style="margin-top:12px;">
+                <div style="font-size:14px;font-weight:bold;margin-bottom:8px;">
+                    Sugestões rápidas
+                </div>
+
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                    {% for sugestao in sugestoes %}
+                    <button
+                        type="button"
+                        onclick="adicionarObservacao(this.dataset.texto)"
+                        data-texto="{{ sugestao['texto'] }}"
+                        style="
+                            width:auto;
+                            min-height:38px;
+                            padding:8px 12px;
+                            margin:0;
+                            border-radius:20px;
+                            border:1px solid #d1d5db;
+                            background:#f3f4f6;
+                            color:#111827;
+                            font-size:13px;
+                            font-weight:600;
+                            box-shadow:none;
+                        "
+                    >
+                        {{ sugestao["texto"] }}
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <script>
+            function adicionarObservacao(texto) {
+                const campo = document.querySelector('textarea[name="observacao"]');
+                if (!campo) return;
+
+                const atual = campo.value.trim();
+
+                if (!atual) {
+                    campo.value = texto;
+                } else if (!atual.includes(texto)) {
+                    campo.value = atual + "; " + texto;
+                }
+            }
+            </script>
 
             <button class="botao" type="submit">
                 REGISTRAR RECEBIMENTO
@@ -599,11 +712,222 @@ def usuarios():
     return render_template_string(USUARIOS_HTML, usuarios=lista)
 
 
+
+OBSERVACOES_HTML = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerenciar observações</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 20px;
+    background: #f3f4f6;
+    font-family: Arial, sans-serif;
+    color: #111827;
+}
+
+.caixa {
+    max-width: 750px;
+    margin: auto;
+    background: white;
+    padding: 24px;
+    border-radius: 14px;
+}
+
+.item {
+    padding: 14px 0;
+    border-bottom: 1px solid #ddd;
+}
+
+.inativo {
+    opacity: .45;
+}
+
+a {
+    color: #111827;
+}
+</style>
+</head>
+<body>
+
+<div class="caixa">
+    <h1>Gerenciar observações</h1>
+
+    <h2>Nova sugestão</h2>
+
+    <form method="POST" action="/observacoes/adicionar">
+        <input
+            name="texto"
+            placeholder="Digite uma nova sugestão"
+            required
+            style="width:100%;padding:13px;border:1px solid #d1d5db;
+            border-radius:9px;font-size:16px;margin-bottom:10px;"
+        >
+
+        <button
+            type="submit"
+            style="width:100%;padding:13px;border:0;border-radius:9px;
+            background:#111827;color:white;font-weight:bold;font-size:15px;"
+        >
+            ADICIONAR SUGESTÃO
+        </button>
+    </form>
+
+    <h2 style="margin-top:30px;">Sugestões cadastradas</h2>
+
+    {% for s in sugestoes_observacao %}
+    <div class="item {% if not s['ativo'] %}inativo{% endif %}">
+
+        <form method="POST" action="/observacoes/editar/{{ s['id'] }}">
+            <input
+                name="texto"
+                value="{{ s['texto'] }}"
+                required
+                style="width:100%;padding:12px;border:1px solid #d1d5db;
+                border-radius:9px;font-size:15px;margin-bottom:8px;"
+            >
+
+            <button
+                type="submit"
+                style="width:100%;padding:11px;border:0;border-radius:9px;
+                background:#111827;color:white;font-weight:bold;"
+            >
+                SALVAR ALTERAÇÃO
+            </button>
+        </form>
+
+        <form
+            method="POST"
+            action="/observacoes/toggle/{{ s['id'] }}"
+            style="margin-top:8px;"
+        >
+            <button
+                type="submit"
+                style="width:100%;padding:11px;border:1px solid #111827;
+                border-radius:9px;background:white;color:#111827;
+                font-weight:bold;"
+            >
+                {% if s["ativo"] %}
+                    DESATIVAR
+                {% else %}
+                    ATIVAR
+                {% endif %}
+            </button>
+        </form>
+
+    </div>
+    {% endfor %}
+
+    <p style="margin-top:25px;">
+        <a href="/">Voltar ao sistema</a>
+    </p>
+</div>
+
+</body>
+</html>
+"""
+
+
+@app.route("/observacoes")
+def gerenciar_observacoes():
+    if session.get("nivel") != "admin":
+        return redirect(url_for("inicio"))
+
+    banco = conectar()
+
+    lista = banco.execute("""
+        SELECT id, texto, ativo
+        FROM sugestoes_observacao
+        ORDER BY texto
+    """).fetchall()
+
+    banco.close()
+
+    return render_template_string(
+        OBSERVACOES_HTML,
+        sugestoes_observacao=lista
+    )
+
+
+@app.route("/observacoes/adicionar", methods=["POST"])
+def adicionar_observacao():
+    if session.get("nivel") != "admin":
+        return redirect(url_for("inicio"))
+
+    texto = request.form.get("texto", "").strip()
+
+    if texto:
+        banco = conectar()
+        banco.execute(
+            """
+            INSERT INTO sugestoes_observacao (texto, ativo)
+            VALUES (?, 1)
+            ON CONFLICT (texto) DO UPDATE SET ativo = 1
+            """,
+            (texto,)
+        )
+        banco.commit()
+        banco.close()
+
+    return redirect(url_for("gerenciar_observacoes"))
+
+
+@app.route("/observacoes/editar/<int:id>", methods=["POST"])
+def editar_observacao(id):
+    if session.get("nivel") != "admin":
+        return redirect(url_for("inicio"))
+
+    texto = request.form.get("texto", "").strip()
+
+    if texto:
+        banco = conectar()
+        banco.execute(
+            "UPDATE sugestoes_observacao SET texto = ? WHERE id = ?",
+            (texto, id)
+        )
+        banco.commit()
+        banco.close()
+
+    return redirect(url_for("gerenciar_observacoes"))
+
+
+@app.route("/observacoes/toggle/<int:id>", methods=["POST"])
+def toggle_observacao(id):
+    if session.get("nivel") != "admin":
+        return redirect(url_for("inicio"))
+
+    banco = conectar()
+    banco.execute(
+        """
+        UPDATE sugestoes_observacao
+        SET ativo = CASE WHEN ativo = 1 THEN 0 ELSE 1 END
+        WHERE id = ?
+        """,
+        (id,)
+    )
+    banco.commit()
+    banco.close()
+
+    return redirect(url_for("gerenciar_observacoes"))
+
+
 @app.route("/")
 def inicio():
     pesquisa = request.args.get("q", "").strip()
 
     banco = conectar()
+
+    sugestoes = banco.execute("""
+        SELECT id, texto
+        FROM sugestoes_observacao
+        WHERE ativo = 1
+        ORDER BY texto
+    """).fetchall()
 
     if pesquisa:
         registros = banco.execute("""
@@ -632,7 +956,8 @@ def inicio():
     return render_template_string(
         HTML,
         registros=registros,
-        pesquisa=pesquisa
+        pesquisa=pesquisa,
+        sugestoes=sugestoes
     )
 
 
