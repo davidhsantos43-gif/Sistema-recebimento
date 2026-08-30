@@ -322,6 +322,7 @@ label {
 
                     <br>
 
+                    {% if session.get("nivel") == "admin" %}
                     <a
                         class="excluir"
                         href="/excluir/{{ r['id'] }}"
@@ -329,6 +330,7 @@ label {
                     >
                         Excluir registro
                     </a>
+                    {% endif %}
 
                 </div>
 
@@ -679,6 +681,9 @@ def registrar():
 
 @app.route("/excluir/<int:id>")
 def excluir(id):
+    if session.get("nivel") != "admin":
+        return redirect(url_for("inicio"))
+
     banco = conectar()
 
     banco.execute(
