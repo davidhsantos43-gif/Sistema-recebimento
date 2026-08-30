@@ -187,10 +187,12 @@ label {
 
 {% if session.get("nivel") == "admin" %}
 <a href="/usuarios"
-   style="display:block;text-align:center;background:#111827;color:white;
-   padding:12px;border-radius:8px;text-decoration:none;margin-bottom:18px;
-   font-weight:bold;">
-    GERENCIAR USUÁRIOS
+   style="display:inline-flex;align-items:center;justify-content:center;gap:10px;
+   background:white;color:#111827;padding:14px 22px;border-radius:12px;
+   text-decoration:none;margin:18px 0 22px;font-weight:bold;
+   border:2px solid rgba(255,255,255,.25);
+   box-shadow:0 4px 12px rgba(0,0,0,.18);">
+    👥 GERENCIAR USUÁRIOS
 </a>
 {% endif %}
 
