@@ -188,6 +188,30 @@ label {
     <div class="container">
         <h1>Controle de Recebimentos</h1>
 
+<a href="/logout"
+   style="display:flex;align-items:center;justify-content:center;
+   width:100%;min-height:54px;
+   background:#111827;color:white;
+   padding:14px 18px;border-radius:9px;
+   text-decoration:none;margin:0 0 12px;
+   font-weight:bold;font-size:16px;
+   border:1px solid rgba(255,255,255,.18);
+   box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
+    SAIR
+</a>
+
+<a href="/logout"
+   style="display:flex;align-items:center;justify-content:center;
+   width:100%;min-height:54px;
+   background:#111827;color:white;
+   padding:14px 18px;border-radius:9px;
+   text-decoration:none;margin:0 0 12px;
+   font-weight:bold;font-size:16px;
+   border:1px solid rgba(255,255,255,.18);
+   box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
+    SAIR
+</a>
+
 {% if session.get("nivel") == "admin" %}
 <a href="/usuarios"
    style="display:flex;align-items:center;justify-content:center;
