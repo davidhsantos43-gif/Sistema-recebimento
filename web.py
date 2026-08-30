@@ -225,6 +225,8 @@ label {
                     <label>Nota fiscal</label>
                     <input
                         name="nota_fiscal"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
                         placeholder="Ex: 123456"
                     >
                 </div>
@@ -234,6 +236,7 @@ label {
                     <input
                         type="number"
                         name="volumes"
+                    inputmode="numeric"
                         min="0"
                         placeholder="Ex: 5"
                     >
