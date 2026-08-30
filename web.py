@@ -608,10 +608,13 @@ def inicio():
             FROM recebimentos
             WHERE fornecedor ILIKE ?
                OR nota_fiscal ILIKE ?
-            ORDER BY id DESC
+            ORDER BY
+                CASE WHEN nota_fiscal = ? THEN 0 ELSE 1 END,
+                id DESC
         """, (
             f"%{pesquisa}%",
-            f"%{pesquisa}%"
+            f"%{pesquisa}%",
+            pesquisa
         )).fetchall()
     else:
         registros = banco.execute("""
