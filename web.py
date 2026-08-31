@@ -3,6 +3,7 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -983,7 +984,7 @@ def registrar():
     else:
         volumes = None
 
-    agora = datetime.now()
+    agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
 
     data = agora.strftime("%d/%m/%Y")
     hora = agora.strftime("%H:%M:%S")
