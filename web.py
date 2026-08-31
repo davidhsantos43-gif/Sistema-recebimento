@@ -1099,6 +1099,7 @@ def registrar():
     """, (
         fornecedor,
         nota_fiscal,
+        data_nf,
         volumes,
         funcionario,
         observacao,
