@@ -674,6 +674,10 @@ a {
     <div class="usuario">
         <strong>{{ u["usuario"] }}</strong>
         — {{ u["nivel"] }}
+
+   <form method="POST" action="/usuarios/excluir/{{ u['id'] }}" onsubmit="return confirm('Tem certeza que deseja excluir este usuC!rio?');">
+    <button type="submit">Excluir</button>
+</form>
     </div>
     {% endfor %}
 
@@ -719,7 +723,24 @@ def usuarios():
     banco.close()
 
     return render_template_string(USUARIOS_HTML, usuarios=lista)
+   
+    @app.route("/usuarios/excluir/<int:id_usuario>", methods=["POST"])
+def excluir_usuario(id_usuario):
+    if session.get("nivel") != "admin":
+        return redirect(url_for("inicio"))
 
+    if id_usuario == session.get("usuario_id"):
+        return redirect(url_for("usuarios"))
+
+    banco = conectar()
+    banco.execute(
+        "DELETE FROM usuarios WHERE id = ?",
+        (id_usuario,)
+    )
+    banco.commit()
+    banco.close()
+
+    return redirect(url_for("usuarios"))
 
 
 OBSERVACOES_HTML = """
