@@ -40,10 +40,15 @@ def criar_banco():
             funcionario TEXT,
             observacao TEXT,
             data TEXT NOT NULL,
-            nota TEXT NOT NULL
+            nota TEXT NOT NULL,
+            conferido INTEGER NOT NULL DEFAULT 0,
+            conferido_por TEXT,
+            conferido_em TEXT
         )
     """)
-
+    banco.execute("ALTER TABLE recebimentos ADD COLUMN IF NOT EXISTS conferido INTEGER NOT NULL DEFAULT 0")
+    banco.execute("ALTER TABLE recebimentos ADD COLUMN IF NOT EXISTS conferido_por TEXT")
+    banco.execute("ALTER TABLE recebimentos ADD COLUMN IF NOT EXISTS conferido_em TEXT")
     banco.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id SERIAL PRIMARY KEY,
@@ -457,7 +462,18 @@ label {
                     </a>
                     {% endif %}
 
-                </div>
+                  {% if r["conferido"] %}
+                 <div>
+                 <strong>Conferido por:</strong> {{ r["conferido_por"] }}
+                 <br>Em: {{ r["conferido_em"] }}
+                 </div>
+                 {% else %}
+                 <form method="POST" action="/conferir/{{ r['id'] }}">
+                 <button type="submit">Marcar como conferido</button>
+                 </form>
+                 {% endif %}
+
+              <div>
 
             {% endfor %}
 
@@ -742,7 +758,23 @@ def excluir_usuario(id_usuario):
 
     return redirect(url_for("usuarios"))
 
+@app.route("/conferir/<int:id_recebimento>", methods=["POST"])
+def conferir_recebimento(id_recebimento):
+    if "usuario" not in session:
+        return redirect(url_for("login"))
 
+    banco = conectar()
+    banco.execute(
+        """UPDATE recebimentos
+        SET conferido = 1,
+        conferido_por = ?,
+        conferido_em = ?
+        WHERE id = ?""",
+        (session["usuario"], datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M"), id_recebimento)
+    )
+    banco.commit()
+    banco.close()
+    return redirect(url_for("inicio"))
 OBSERVACOES_HTML = """
 <!DOCTYPE html>
 <html lang="pt-BR">
