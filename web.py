@@ -36,6 +36,7 @@ def criar_banco():
             id SERIAL PRIMARY KEY,
             fornecedor TEXT NOT NULL,
             nota_fiscal TEXT,
+        data_nf TEXT,
             volumes INTEGER,
             funcionario TEXT,
             observacao TEXT,
@@ -46,6 +47,7 @@ def criar_banco():
             conferido_em TEXT
         )
     """)
+    banco.execute("ALTER TABLE recebimentos ADD COLUMN IF NOT EXISTS data_nf TEXT")
     banco.execute("ALTER TABLE recebimentos ADD COLUMN IF NOT EXISTS conferido INTEGER NOT NULL DEFAULT 0")
     banco.execute("ALTER TABLE recebimentos ADD COLUMN IF NOT EXISTS conferido_por TEXT")
     banco.execute("ALTER TABLE recebimentos ADD COLUMN IF NOT EXISTS conferido_em TEXT")
@@ -305,6 +307,9 @@ label {
                 </div>
 
                 <div>
+                    <label>Data da NF</label>
+                    <input type="date" name="data_nf" required>
+
                     <label>Quantidade de volumes</label>
                     <input
                         type="number"
@@ -420,6 +425,13 @@ label {
                             {{ r["nota_fiscal"] }}
                         </div>
                     {% endif %}
+{% if r["data_nf"] %}
+<div>
+<strong>Data da NF:</strong>
+{{ r["data_nf"][8:10] }}/{{ r["data_nf"][5:7] }}/{{ r["data_nf"][0:4] }}
+</div>
+{% endif %}
+
 
                     {% if r["volumes"] %}
                         <div>
@@ -1053,6 +1065,7 @@ def inicio():
 def registrar():
     fornecedor = request.form["fornecedor"].strip()
     nota_fiscal = request.form["nota_fiscal"].strip()
+    data_nf = request.form.get("data_nf", "").strip()
     funcionario = session.get("usuario", "")
     observacao = request.form["observacao"].strip()
 
@@ -1075,13 +1088,14 @@ def registrar():
         (
             fornecedor,
             nota_fiscal,
+            data_nf,
             volumes,
             funcionario,
             observacao,
             data,
             hora
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         fornecedor,
         nota_fiscal,
@@ -1246,6 +1260,9 @@ button {
 
         >
 
+        <label>Data da NF</label>
+        <input type="date" name="data_nf" value="{{ registro['data_nf'] or '' }}">
+
         <label>Quantidade de volumes</label>
 
         <input
@@ -1317,6 +1334,8 @@ def editar_recebimento(id):
         fornecedor = request.form.get("fornecedor", "").strip()
 
         nota_fiscal = request.form.get("nota_fiscal", "").strip()
+
+        data_nf = request.form.get("data_nf", "").strip()
 
         observacao = request.form.get("observacao", "").strip()
 
