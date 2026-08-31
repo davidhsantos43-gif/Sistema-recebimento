@@ -724,7 +724,7 @@ def usuarios():
 
     return render_template_string(USUARIOS_HTML, usuarios=lista)
    
-    @app.route("/usuarios/excluir/<int:id_usuario>", methods=["POST"])
+@app.route("/usuarios/excluir/<int:id_usuario>", methods=["POST"])
 def excluir_usuario(id_usuario):
     if session.get("nivel") != "admin":
         return redirect(url_for("inicio"))
