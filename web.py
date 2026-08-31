@@ -467,6 +467,11 @@ label {
                  <strong>Conferido por:</strong> {{ r["conferido_por"] }}
                  <br>Em: {{ r["conferido_em"] }}
                  </div>
+{% if session.get("nivel") == "admin" %}
+<form method="POST" action="/desfazer-conferencia/{{ r['id'] }}" onsubmit="return confirm('Tem certeza que deseja desfazer esta conferência?');">
+<button type="submit">Desfazer conferência</button>
+</form>
+{% endif %}
                  {% else %}
                  <form method="POST" action="/conferir/{{ r['id'] }}">
                  <button type="submit">Marcar como conferido</button>
@@ -775,6 +780,27 @@ def conferir_recebimento(id_recebimento):
     banco.commit()
     banco.close()
     return redirect(url_for("inicio"))
+
+@app.route("/desfazer-conferencia/<int:id_recebimento>", methods=["POST"])
+def desfazer_conferencia(id_recebimento):
+    if session.get("nivel") != "admin":
+        return redirect(url_for("inicio"))
+
+    banco = conectar()
+    banco.execute(
+        """UPDATE recebimentos
+        SET conferido = 0,
+            conferido_por = NULL,
+            conferido_em = NULL
+        WHERE id = ?""",
+        (id_recebimento,)
+    )
+    banco.commit()
+    banco.close()
+
+    return redirect(url_for("inicio"))
+
+
 OBSERVACOES_HTML = """
 <!DOCTYPE html>
 <html lang="pt-BR">
