@@ -871,7 +871,7 @@ a {
         — {{ u["nivel"] }}
 
    <form method="POST" action="/usuarios/excluir/{{ u['id'] }}" onsubmit="return confirm('Tem certeza que deseja excluir este usuC!rio?');">
-    <button type="submit">Excluir</button>
+    <button type="submit" style="width:auto; padding:6px 12px; display:inline-block;">Excluir</button>
 </form>
     </div>
     {% endfor %}
