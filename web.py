@@ -28,6 +28,29 @@ class Banco:
 def conectar():
     return Banco()
 
+
+def registrar_log(usuario, acao, entidade=None, entidade_id=None, detalhes=None):
+    try:
+        banco = conectar()
+        banco.execute(
+            """
+            INSERT INTO logs (usuario, acao, entidade, entidade_id, detalhes, data_hora)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                usuario,
+                acao,
+                entidade,
+                entidade_id,
+                detalhes,
+                datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S"),
+            ),
+        )
+        banco.commit()
+        banco.close()
+    except Exception as e:
+        print("ERRO_LOG:", e)
+
 def criar_banco():
     banco = conectar()
 
@@ -57,6 +80,18 @@ def criar_banco():
             usuario TEXT UNIQUE NOT NULL,
             senha TEXT NOT NULL,
             nivel TEXT NOT NULL DEFAULT 'funcionario'
+        )
+    """)
+
+    banco.execute("""
+        CREATE TABLE IF NOT EXISTS logs (
+            id SERIAL PRIMARY KEY,
+            usuario TEXT,
+            acao TEXT NOT NULL,
+            entidade TEXT,
+            entidade_id INTEGER,
+            detalhes TEXT,
+            data_hora TEXT NOT NULL
         )
     """)
 
@@ -435,6 +470,18 @@ label {
     GERENCIAR USUÁRIOS
 </a>
 
+<a href="/logs"
+   style="display:flex;align-items:center;justify-content:center;
+   width:100%;min-height:54px;
+   background:#111827;color:white;
+   padding:14px 18px;border-radius:9px;
+   text-decoration:none;margin:0 0 22px;
+   font-weight:bold;font-size:16px;
+   border:1px solid rgba(255,255,255,.18);
+   box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
+    LOGS DO SISTEMA
+</a>
+
 <a href="/observacoes"
    style="display:flex;align-items:center;justify-content:center;
    width:100%;min-height:54px;
@@ -784,6 +831,13 @@ def login():
             session["usuario_id"] = registro["id"]
             session["usuario"] = registro["usuario"]
             session["nivel"] = registro["nivel"]
+            registrar_log(
+                registro["usuario"],
+                "LOGIN",
+                "sessao",
+                registro["id"],
+                "Login realizado com sucesso"
+            )
             return redirect(url_for("inicio"))
 
         erro = "Usuário ou senha inválidos."
@@ -793,6 +847,15 @@ def login():
 
 @app.route("/logout")
 def logout():
+    usuario = session.get("usuario", "desconhecido")
+    usuario_id = session.get("usuario_id")
+    registrar_log(
+        usuario,
+        "LOGOUT",
+        "sessao",
+        usuario_id,
+        "Logout realizado"
+    )
     session.clear()
     return redirect(url_for("login"))
 
@@ -802,6 +865,137 @@ def exigir_login():
     if request.endpoint not in ("login", "static") and not session.get("logado"):
         return redirect(url_for("login"))
 
+
+
+
+LOGS_HTML = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logs do sistema</title>
+<style>
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f3f5f7;
+    color: #222;
+}
+.container {
+    max-width: 1100px;
+    margin: 30px auto;
+    padding: 20px;
+}
+.card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.08);
+}
+h1 {
+    margin-top: 0;
+}
+.tabela-wrap {
+    overflow-x: auto;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+th, td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #ddd;
+    text-align: left;
+    vertical-align: top;
+}
+th {
+    background: #111827;
+    color: white;
+}
+tr:hover {
+    background: #f8fafc;
+}
+.detalhes {
+    min-width: 300px;
+    word-break: break-word;
+}
+.voltar {
+    display: inline-block;
+    margin-top: 20px;
+    color: #111827;
+    font-weight: bold;
+}
+.vazio {
+    padding: 25px 0;
+    color: #666;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="card">
+<h1>Logs do sistema</h1>
+<p>Registro das principais ações realizadas no sistema.</p>
+
+{% if logs %}
+<div class="tabela-wrap">
+<table>
+<thead>
+<tr>
+    <th>Data/Hora</th>
+    <th>Usuário</th>
+    <th>Ação</th>
+    <th>Tipo</th>
+    <th>ID</th>
+    <th>Detalhes</th>
+</tr>
+</thead>
+<tbody>
+{% for log in logs %}
+<tr>
+    <td>{{ log["data_hora"] }}</td>
+    <td>{{ log["usuario"] or "-" }}</td>
+    <td>{{ log["acao"] }}</td>
+    <td>{{ log["entidade"] or "-" }}</td>
+    <td>{{ log["entidade_id"] or "-" }}</td>
+    <td class="detalhes">{{ log["detalhes"] or "-" }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<p class="vazio">Nenhum log registrado ainda.</p>
+{% endif %}
+
+<a class="voltar" href="/">Voltar ao sistema</a>
+</div>
+</div>
+</body>
+</html>
+"""
+
+
+@app.route("/logs")
+def logs_sistema():
+    if session.get("nivel") != "admin":
+        return redirect(url_for("inicio"))
+
+    banco = conectar()
+    logs = banco.execute(
+        """
+        SELECT id, usuario, acao, entidade, entidade_id, detalhes, data_hora
+        FROM logs
+        ORDER BY id DESC
+        LIMIT 500
+        """
+    ).fetchall()
+    banco.close()
+
+    return render_template_string(LOGS_HTML, logs=logs)
 
 
 USUARIOS_HTML = """
@@ -911,6 +1105,14 @@ def usuarios():
                 )
                 banco.commit()
 
+            registrar_log(
+                session.get("usuario"),
+                "CRIOU USUARIO",
+                "usuario",
+                None,
+                f"Usuário criado: {usuario} | nível: {nivel}"
+            )
+
     lista = banco.execute(
         "SELECT id, usuario, nivel FROM usuarios ORDER BY usuario"
     ).fetchall()
@@ -928,12 +1130,27 @@ def excluir_usuario(id_usuario):
         return redirect(url_for("usuarios"))
 
     banco = conectar()
+
+    usuario_excluido = banco.execute(
+        "SELECT usuario, nivel FROM usuarios WHERE id = ?",
+        (id_usuario,)
+    ).fetchone()
+
     banco.execute(
         "DELETE FROM usuarios WHERE id = ?",
         (id_usuario,)
     )
     banco.commit()
     banco.close()
+
+    if usuario_excluido:
+        registrar_log(
+            session.get("usuario"),
+            "EXCLUIU USUARIO",
+            "usuario",
+            id_usuario,
+            f"Usuário excluído: {usuario_excluido['usuario']} | nível: {usuario_excluido['nivel']}"
+        )
 
     return redirect(url_for("usuarios"))
 
@@ -953,6 +1170,15 @@ def conferir_recebimento(id_recebimento):
     )
     banco.commit()
     banco.close()
+
+    registrar_log(
+        session.get("usuario"),
+        "CONFERENCIA",
+        "recebimento",
+        id_recebimento,
+        "Recebimento marcado como conferido"
+    )
+
     return redirect(url_for("inicio"))
 
 @app.route("/desfazer-conferencia/<int:id_recebimento>", methods=["POST"])
@@ -971,6 +1197,14 @@ def desfazer_conferencia(id_recebimento):
     )
     banco.commit()
     banco.close()
+
+    registrar_log(
+        session.get("usuario"),
+        "DESFEZ CONFERENCIA",
+        "recebimento",
+        id_recebimento,
+        "Conferência do recebimento removida"
+    )
 
     return redirect(url_for("inicio"))
 
@@ -1542,6 +1776,28 @@ def editar_recebimento(id):
 
         banco.commit()
 
+        alteracoes = []
+
+        if registro["fornecedor"] != fornecedor:
+            alteracoes.append(f'Fornecedor: {registro["fornecedor"]} -> {fornecedor}')
+
+        if registro["nota_fiscal"] != nota_fiscal:
+            alteracoes.append(f'NF: {registro["nota_fiscal"]} -> {nota_fiscal}')
+
+        if registro["volumes"] != volumes:
+            alteracoes.append(f'Volumes: {registro["volumes"]} -> {volumes}')
+
+        if registro["observacao"] != observacao:
+            alteracoes.append(f'Observação: {registro["observacao"]} -> {observacao}')
+
+        registrar_log(
+            session.get("usuario"),
+            "EDITOU RECEBIMENTO",
+            "recebimento",
+            id,
+            " | ".join(alteracoes) if alteracoes else "Salvou sem alterações"
+        )
+
         banco.close()
 
         return redirect(url_for("inicio"))
@@ -1563,6 +1819,15 @@ def excluir(id):
 
     banco = conectar()
 
+    registro = banco.execute(
+        """
+        SELECT fornecedor, nota_fiscal, volumes, observacao
+        FROM recebimentos
+        WHERE id = ?
+        """,
+        (id,)
+    ).fetchone()
+
     banco.execute(
         "DELETE FROM recebimentos WHERE id = ?",
         (id,)
@@ -1570,6 +1835,15 @@ def excluir(id):
 
     banco.commit()
     banco.close()
+
+    if registro:
+        registrar_log(
+            session.get("usuario"),
+            "EXCLUIU RECEBIMENTO",
+            "recebimento",
+            id,
+            f'Fornecedor: {registro["fornecedor"]} | NF: {registro["nota_fiscal"]} | Volumes: {registro["volumes"]} | Observação: {registro["observacao"]}'
+        )
 
     return redirect("/")
 
