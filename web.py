@@ -237,6 +237,175 @@ label {
     text-decoration: none;
 }
 
+.historico-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.historico-titulo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.historico-titulo h2 {
+    margin: 0;
+}
+
+.total-registros {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #e5e7eb;
+    color: #374151;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.historico-grade {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.historico-tabela {
+    width: 100%;
+    min-width: 1180px;
+    border-collapse: collapse;
+    background: white;
+}
+
+.historico-tabela th,
+.historico-tabela td {
+    padding: 13px 12px;
+    border-right: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+    vertical-align: top;
+    font-size: 14px;
+}
+
+.historico-tabela th:last-child,
+.historico-tabela td:last-child {
+    border-right: 0;
+}
+
+.historico-tabela th {
+    background: #111827;
+    color: white;
+    font-size: 12px;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.historico-tabela tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+.historico-tabela tbody tr:hover {
+    background: #eef2ff;
+}
+
+.historico-tabela .col-fornecedor {
+    min-width: 150px;
+    font-weight: bold;
+}
+
+.historico-tabela .col-observacao {
+    min-width: 210px;
+    max-width: 280px;
+    white-space: normal;
+}
+
+.data-hora {
+    white-space: nowrap;
+}
+
+.data-hora span,
+.conferencia-detalhes {
+    display: block;
+    margin-top: 4px;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.status {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.status-conferido {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-pendente {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.acoes {
+    min-width: 150px;
+}
+
+.acoes a,
+.acoes button {
+    display: block;
+    width: 100%;
+    min-height: 36px;
+    margin: 0 0 7px;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 7px;
+    background: white;
+    color: #111827;
+    font: inherit;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 18px;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.acoes form {
+    margin: 0;
+}
+
+.acoes .acao-conferir {
+    background: #111827;
+    border-color: #111827;
+    color: white;
+}
+
+.acoes .acao-excluir,
+.acoes .acao-desfazer {
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.historico-vazio {
+    margin: 0;
+    padding: 24px 20px;
+    color: #6b7280;
+}
+
+.dica-rolagem {
+    display: none;
+    margin: 0;
+    padding: 10px 20px;
+    background: #f8fafc;
+    color: #6b7280;
+    font-size: 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
 @media (max-width: 650px) {
     .grid {
         grid-template-columns: 1fr;
@@ -402,102 +571,95 @@ label {
         </form>
     </div>
 
-    <div class="card">
-        <h2>Histórico</h2>
+    <div class="card historico-card">
+        <div class="historico-titulo">
+            <h2>Histórico</h2>
+            <span class="total-registros">
+                {{ registros|length }} registro{% if registros|length != 1 %}s{% endif %}
+            </span>
+        </div>
 
         {% if registros %}
+        <p class="dica-rolagem">Deslize a grade para o lado para ver todas as colunas.</p>
 
-            {% for r in registros %}
+        <div class="historico-grade">
+            <table class="historico-tabela">
+                <thead>
+                    <tr>
+                        <th>Fornecedor</th>
+                        <th>Recebimento</th>
+                        <th>NF</th>
+                        <th>Data da NF</th>
+                        <th>Volumes</th>
+                        <th>Recebido por</th>
+                        <th>Observação</th>
+                        <th>Conferência</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in registros %}
+                    <tr>
+                        <td class="col-fornecedor">{{ r["fornecedor"] }}</td>
 
-                <div class="registro">
+                        <td class="data-hora">
+                            {{ r["data"] }}
+                            <span>{{ r["hora"] }}</span>
+                        </td>
 
-                    <div class="fornecedor">
-                        {{ r["fornecedor"] }}
-                    </div>
+                        <td>{{ r["nota_fiscal"] or "—" }}</td>
 
-                    <div class="data">
-                        {{ r["data"] }} às {{ r["hora"] }}
-                    </div>
+                        <td class="data-hora">
+                            {% if r["data_nf"] %}
+                                {{ r["data_nf"][8:10] }}/{{ r["data_nf"][5:7] }}/{{ r["data_nf"][0:4] }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
 
-                    {% if r["nota_fiscal"] %}
-                        <div>
-                            <strong>NF:</strong>
-                            {{ r["nota_fiscal"] }}
-                        </div>
-                    {% endif %}
-{% if r["data_nf"] %}
-<div>
-<strong>Data da NF:</strong>
-{{ r["data_nf"][8:10] }}/{{ r["data_nf"][5:7] }}/{{ r["data_nf"][0:4] }}
-</div>
-{% endif %}
+                        <td>{{ r["volumes"] if r["volumes"] is not none else "—" }}</td>
+                        <td>{{ r["funcionario"] or "—" }}</td>
+                        <td class="col-observacao">{{ r["observacao"] or "—" }}</td>
 
+                        <td>
+                            {% if r["conferido"] %}
+                                <span class="status status-conferido">Conferido</span>
+                                <span class="conferencia-detalhes">
+                                    Por: {{ r["conferido_por"] or "—" }}<br>
+                                    Em: {{ r["conferido_em"] or "—" }}
+                                </span>
+                            {% else %}
+                                <span class="status status-pendente">Pendente</span>
+                            {% endif %}
+                        </td>
 
-                    {% if r["volumes"] %}
-                        <div>
-                            <strong>Volumes:</strong>
-                            {{ r["volumes"] }}
-                        </div>
-                    {% endif %}
+                        <td class="acoes">
+                            {% if not r["conferido"] %}
+                            <form method="POST" action="/conferir/{{ r['id'] }}">
+                                <button class="acao-conferir" type="submit">Marcar conferido</button>
+                            </form>
+                            {% elif session.get("nivel") == "admin" %}
+                            <form method="POST" action="/desfazer-conferencia/{{ r['id'] }}" onsubmit="return confirm('Tem certeza que deseja desfazer esta conferência?');">
+                                <button class="acao-desfazer" type="submit">Desfazer conferência</button>
+                            </form>
+                            {% endif %}
 
-                    {% if r["funcionario"] %}
-                        <div>
-                            <strong>Recebido por:</strong>
-                            {{ r["funcionario"] }}
-                        </div>
-                    {% endif %}
-
-                    {% if r["observacao"] %}
-                        <div>
-                            <strong>Observação:</strong>
-                            {{ r["observacao"] }}
-                        </div>
-                    {% endif %}
-
-                    <br>
-
-                    {% if session.get("nivel") == "admin" %}
-                    <a
-                        href="/editar/{{ r['id'] }}"
-                        style="display:inline-block;margin-right:14px;
-                        color:#111827;text-decoration:none;font-weight:bold;"
-                    >
-                        Editar registro
-                    </a>
-
-                    <a
-                        class="excluir"
-                        href="/excluir/{{ r['id'] }}"
-                        onclick="return confirm('Excluir este recebimento?')"
-                    >
-                        Excluir registro
-                    </a>
-                    {% endif %}
-
-                  {% if r["conferido"] %}
-                 <div>
-                 <strong>Conferido por:</strong> {{ r["conferido_por"] }}
-                 <br>Em: {{ r["conferido_em"] }}
-                 </div>
-{% if session.get("nivel") == "admin" %}
-<form method="POST" action="/desfazer-conferencia/{{ r['id'] }}" onsubmit="return confirm('Tem certeza que deseja desfazer esta conferência?');">
-<button type="submit">Desfazer conferência</button>
-</form>
-{% endif %}
-                 {% else %}
-                 <form method="POST" action="/conferir/{{ r['id'] }}">
-                 <button type="submit">Marcar como conferido</button>
-                 </form>
-                 {% endif %}
-
-              <div>
-
-            {% endfor %}
-
+                            {% if session.get("nivel") == "admin" %}
+                            <a href="/editar/{{ r['id'] }}">Editar</a>
+                            <a
+                                class="acao-excluir"
+                                href="/excluir/{{ r['id'] }}"
+                                onclick="return confirm('Excluir este recebimento?')"
+                            >Excluir</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
-
-            <p>Nenhum recebimento encontrado.</p>
-
+            <p class="historico-vazio">Nenhum recebimento encontrado.</p>
         {% endif %}
     </div>
 
