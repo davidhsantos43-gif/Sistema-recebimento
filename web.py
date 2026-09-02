@@ -237,6 +237,8 @@ label {
     text-decoration: none;
 }
 
+.sugestoes-bloco {margin:12px 0;border:1px solid #d1d5db;border-radius:9px;background:#f9fafb;overflow:hidden}.sugestoes-bloco summary {padding:13px 15px;color:#111827;font-size:14px;font-weight:bold;cursor:pointer;user-select:none}.sugestoes-bloco[open] summary {border-bottom:1px solid #d1d5db;background:#f3f4f6}.sugestoes-lista {display:flex;flex-wrap:wrap;gap:8px;padding:12px}
+
 .historico-card {
     padding: 0;
     overflow: hidden;
@@ -503,12 +505,10 @@ label {
                 placeholder="Avarias, falta de volumes ou observações..."
             ></textarea>
 
-            <div style="margin-top:12px;">
-                <div style="font-size:14px;font-weight:bold;margin-bottom:8px;">
-                    Sugestões rápidas
-                </div>
+            <details class="sugestoes-bloco">
+                <summary>Selecionar sugestões rápidas</summary>
 
-                <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <div class="sugestoes-lista">
                     {% for sugestao in sugestoes %}
                     <button
                         type="button"
@@ -532,7 +532,7 @@ label {
                     </button>
                     {% endfor %}
                 </div>
-            </div>
+            </details>
 
             <script>
             function adicionarObservacao(texto) {
