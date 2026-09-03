@@ -1281,6 +1281,168 @@ def assistente():
                 arquivo_periodo=arquivo_periodo
             )
 
+        if "hoje" in texto and ("quantos recebimentos" in texto or "quantas entregas" in texto):
+            hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")
+            banco = conectar()
+            total = banco.execute(
+                "SELECT COUNT(*) AS total FROM recebimentos WHERE data = ?",
+                (hoje,)
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Hoje foram registrados {total} recebimento(s)."
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+        if "hoje" in texto and "volume" in texto:
+            hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")
+            banco = conectar()
+            total = banco.execute(
+                "SELECT COALESCE(SUM(volumes), 0) AS total FROM recebimentos WHERE data = ?",
+                (hoje,)
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Hoje chegaram {total} volume(s)."
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+        if "pendente" in texto or "pendentes" in texto:
+            banco = conectar()
+            resultados = banco.execute(
+                """
+                SELECT *
+                FROM recebimentos
+                WHERE conferido = 0
+                ORDER BY id DESC
+                """
+            ).fetchall()
+            banco.close()
+
+            if resultados:
+                mensagem = f"Encontrei {len(resultados)} recebimento(s) pendente(s)."
+            else:
+                mensagem = "Não há recebimentos pendentes."
+
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=resultados,
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+        if "quem recebeu mais" in texto and "hoje" in texto:
+            hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")
+
+            banco = conectar()
+            top = banco.execute(
+                """
+                SELECT funcionario,
+                       COUNT(*) AS recebimentos,
+                       COALESCE(SUM(volumes), 0) AS volumes
+                FROM recebimentos
+                WHERE data = ?
+                GROUP BY funcionario
+                ORDER BY recebimentos DESC, volumes DESC
+                LIMIT 1
+                """,
+                (hoje,)
+            ).fetchone()
+            banco.close()
+
+            if top and top["funcionario"]:
+                mensagem = (
+                    f"Hoje, {top['funcionario']} recebeu mais: "
+                    f"{top['recebimentos']} recebimento(s), "
+                    f"somando {top['volumes']} volume(s)."
+                )
+            else:
+                mensagem = "Ainda não há recebimentos registrados hoje."
+
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+        if ("quantas entregas" in texto or "quantos recebimentos" in texto) and ("este mes" in texto or "este mês" in texto):
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            inicio = agora.replace(day=1).date()
+
+            banco = conectar()
+            total = banco.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM recebimentos
+                WHERE TO_DATE(data, 'DD/MM/YYYY')
+                BETWEEN ?::date AND ?::date
+                """,
+                (inicio.isoformat(), agora.date().isoformat())
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Neste mês foram registrados {total} recebimento(s)."
+
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+        if "recebimentos da " in texto or "recebimentos do " in texto or "chegou da " in texto or "chegou do " in texto:
+            fornecedor = None
+
+            for marcador in ["recebimentos da ", "recebimentos do ", "chegou da ", "chegou do "]:
+                if marcador in texto:
+                    fornecedor = pergunta.lower().split(marcador, 1)[1].strip()
+                    break
+
+            banco = conectar()
+            resultados = banco.execute(
+                """
+                SELECT *
+                FROM recebimentos
+                WHERE fornecedor ILIKE ?
+                ORDER BY id DESC
+                """,
+                (f"%{fornecedor}%",)
+            ).fetchall()
+            banco.close()
+
+            if resultados:
+                mensagem = f"Encontrei {len(resultados)} recebimento(s) de {fornecedor}."
+            else:
+                mensagem = f"Não encontrei recebimentos de {fornecedor}."
+
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=resultados,
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
         numeros = []
         for parte in pergunta.split():
             numero = "".join(c for c in parte if c.isdigit())
