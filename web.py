@@ -1159,6 +1159,107 @@ body {
 </html>
 """
 
+
+ASSISTENTE_HTML = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Assistente</title>
+<style>
+body{font-family:Arial;background:#f3f4f6;margin:0;padding:20px;color:#111}
+.caixa{max-width:800px;margin:30px auto;background:white;padding:24px;border-radius:14px}
+textarea{width:100%;min-height:100px;padding:14px;box-sizing:border-box;border:1px solid #ccc;border-radius:9px;font-size:16px}
+button,.voltar{background:#111827;color:white;border:0;border-radius:9px;padding:13px 18px;font-weight:bold;margin-top:10px;text-decoration:none;display:inline-block}
+.resultado{margin-top:22px;padding:18px;background:#f3f4f6;border-radius:10px}
+.item{padding:14px 0;border-bottom:1px solid #ddd}
+</style>
+</head>
+<body>
+<div class="caixa">
+<h1>✨ Assistente</h1>
+<p>Pergunte sobre uma nota fiscal.</p>
+
+<form method="POST">
+<textarea name="pergunta" placeholder="Ex: Que dia chegou a NF 123456?" required>{{ pergunta or "" }}</textarea>
+<button type="submit">Perguntar</button>
+</form>
+
+{% if mensagem %}
+<div class="resultado">{{ mensagem }}</div>
+{% endif %}
+
+{% if resultados %}
+<div class="resultado">
+{% for r in resultados %}
+<div class="item">
+<strong>NF {{ r["nota_fiscal"] or "-" }}</strong><br>
+Fornecedor: {{ r["fornecedor"] or "-" }}<br>
+Data da NF: {{ r["data_nf"] or "-" }}<br>
+Recebido em: {{ r["data"] or "-" }} às {{ r["hora"] or "-" }}<br>
+Volumes: {{ r["volumes"] or "-" }}<br>
+Recebido por: {{ r["funcionario"] or "-" }}<br>
+Observação: {{ r["observacao"] or "-" }}<br>
+Status: {% if r["conferido"] %}✅ Conferido{% else %}⏳ Pendente{% endif %}<br>
+{% if r["conferido"] %}
+Conferido por: {{ r["conferido_por"] or "-" }}<br>
+Conferido em: {{ r["conferido_em"] or "-" }}
+{% endif %}
+</div>
+{% endfor %}
+</div>
+{% endif %}
+
+<a class="voltar" href="/">← Voltar</a>
+</div>
+</body>
+</html>
+"""
+
+@app.route("/assistente", methods=["GET","POST"])
+def assistente():
+    pergunta = ""
+    mensagem = None
+    resultados = []
+
+    if request.method == "POST":
+        pergunta = request.form.get("pergunta", "").strip()
+
+        numeros = []
+        for parte in pergunta.split():
+            numero = "".join(c for c in parte if c.isdigit())
+            if numero:
+                numeros.append(numero)
+
+        if not numeros:
+            mensagem = "Informe o número da nota fiscal na pergunta."
+        else:
+            nf = max(numeros, key=len)
+
+            banco = conectar()
+            resultados = banco.execute(
+                """
+                SELECT *
+                FROM recebimentos
+                WHERE nota_fiscal = ?
+                ORDER BY id DESC
+                """,
+                (nf,)
+            ).fetchall()
+            banco.close()
+
+            if not resultados:
+                mensagem = f"Nenhum recebimento encontrado para a NF {nf}."
+
+    return render_template_string(
+        ASSISTENTE_HTML,
+        pergunta=pergunta,
+        mensagem=mensagem,
+        resultados=resultados
+    )
+
+
 @app.route("/configuracoes")
 def configuracoes():
     if session.get("usuario") != "ADMIN":
