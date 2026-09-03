@@ -514,6 +514,28 @@ label {
 
 <div class="container">
 
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:18px;">
+        <div style="background:#111827;color:white;padding:16px;border-radius:12px;">
+            <div style="font-size:13px;opacity:.8;">📦 Hoje</div>
+            <div style="font-size:28px;font-weight:bold;">{{ total_hoje }}</div>
+        </div>
+
+        <div style="background:#111827;color:white;padding:16px;border-radius:12px;">
+            <div style="font-size:13px;opacity:.8;">📅 Esta semana</div>
+            <div style="font-size:28px;font-weight:bold;">{{ total_semana }}</div>
+        </div>
+
+        <div style="background:#111827;color:white;padding:16px;border-radius:12px;">
+            <div style="font-size:13px;opacity:.8;">⏳ Pendentes</div>
+            <div style="font-size:28px;font-weight:bold;">{{ total_pendentes }}</div>
+        </div>
+
+        <div style="background:#111827;color:white;padding:16px;border-radius:12px;">
+            <div style="font-size:13px;opacity:.8;">✅ Conferidos</div>
+            <div style="font-size:28px;font-weight:bold;">{{ total_conferidos }}</div>
+        </div>
+    </div>
+
     <div class="card">
         <h2>Novo recebimento</h2>
 
