@@ -1204,6 +1204,17 @@ button,.voltar{background:#111827;color:white;border:0;border-radius:9px;padding
 <div class="resultado">{{ mensagem }}</div>
 {% endif %}
 
+{% if arquivo_formato and arquivo_periodo %}
+<div class="resultado">
+    <a href="/relatorios/gerar?formato={{ arquivo_formato }}&periodo={{ arquivo_periodo }}"
+       style="display:inline-block;background:#111827;color:white;
+              padding:12px 16px;border-radius:9px;text-decoration:none;
+              font-weight:bold;">
+        ⬇️ Baixar arquivo
+    </a>
+</div>
+{% endif %}
+
 {% if resultados %}
 <div class="resultado">
 {% for r in resultados %}
@@ -1260,8 +1271,14 @@ def assistente():
             arquivo_periodo = "tudo"
 
         if arquivo_formato and arquivo_periodo:
-            return redirect(
-                f"/relatorios/gerar?formato={arquivo_formato}&periodo={arquivo_periodo}"
+            mensagem = "Arquivo pronto para gerar."
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=arquivo_formato,
+                arquivo_periodo=arquivo_periodo
             )
 
         numeros = []
