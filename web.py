@@ -1,11 +1,36 @@
 from flask import Flask, request, redirect, render_template_string, session, url_for, send_file
 from io import BytesIO
 import os
+import unicodedata
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from werkzeug.security import generate_password_hash, check_password_hash
+
+def normalizar_texto(texto):
+    texto = texto.lower().strip()
+
+    trocas = {
+        "hj": "hoje",
+        "qtd": "quantidade",
+        "qnts": "quantos",
+        "qnt": "quanto",
+        "nf": "nota fiscal",
+        "nfs": "notas fiscais",
+    }
+
+    palavras = texto.split()
+    palavras = [trocas.get(p, p) for p in palavras]
+    texto = " ".join(palavras)
+
+    texto = "".join(
+        c for c in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(c) != "Mn"
+    )
+
+    return texto
+
 
 app = Flask(__name__)
 app.secret_key = os.environ["SECRET_KEY"]
@@ -1252,7 +1277,7 @@ def assistente():
 
     if request.method == "POST":
         pergunta = request.form.get("pergunta", "").strip()
-        texto = pergunta.lower()
+        texto = normalizar_texto(pergunta)
         if "pdf" in texto:
             arquivo_formato = "pdf"
         elif "excel" in texto or "xlsx" in texto:
@@ -1281,7 +1306,10 @@ def assistente():
                 arquivo_periodo=arquivo_periodo
             )
 
-        if "hoje" in texto and ("quantos recebimentos" in texto or "quantas entregas" in texto):
+        if "hoje" in texto and (
+            any(x in texto for x in ["quantos", "quantas", "quanto", "quantidade"])
+            and any(x in texto for x in ["recebimento", "entrega", "mercadoria"])
+        ):
             hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")
             banco = conectar()
             total = banco.execute(
@@ -1319,7 +1347,14 @@ def assistente():
                 arquivo_periodo=None
             )
 
-        if "pendente" in texto or "pendentes" in texto:
+        if (
+            "pendente" in texto
+            or "pendentes" in texto
+            or "falta conferir" in texto
+            or "faltam conferir" in texto
+            or "nao foi conferido" in texto
+            or "nao foram conferidos" in texto
+        ):
             banco = conectar()
             resultados = banco.execute(
                 """
@@ -1345,7 +1380,12 @@ def assistente():
                 arquivo_periodo=None
             )
 
-        if "quem recebeu mais" in texto and "hoje" in texto:
+        if "hoje" in texto and (
+            "quem recebeu mais" in texto
+            or "quem mais recebeu" in texto
+            or "qual funcionario recebeu mais" in texto
+            or "quem teve mais recebimentos" in texto
+        ):
             hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")
 
             banco = conectar()
@@ -1409,10 +1449,28 @@ def assistente():
                 arquivo_periodo=None
             )
 
-        if "recebimentos da " in texto or "recebimentos do " in texto or "chegou da " in texto or "chegou do " in texto:
+        if (
+            "recebimentos da " in texto
+            or "recebimentos do " in texto
+            or "chegou da " in texto
+            or "chegou do " in texto
+            or "vieram da " in texto
+            or "vieram do " in texto
+            or "recebemos da " in texto
+            or "recebemos do " in texto
+        ):
             fornecedor = None
 
-            for marcador in ["recebimentos da ", "recebimentos do ", "chegou da ", "chegou do "]:
+            for marcador in [
+                "recebimentos da ",
+                "recebimentos do ",
+                "chegou da ",
+                "chegou do ",
+                "vieram da ",
+                "vieram do ",
+                "recebemos da ",
+                "recebemos do ",
+            ]:
                 if marcador in texto:
                     fornecedor = pergunta.lower().split(marcador, 1)[1].strip()
                     break
@@ -1442,6 +1500,343 @@ def assistente():
                 arquivo_formato=None,
                 arquivo_periodo=None
             )
+
+        if "semana" in texto and (
+            any(x in texto for x in ["quantos", "quantas", "quanto", "quantidade"])
+            and any(x in texto for x in ["recebimento", "entrega", "mercadoria"])
+        ):
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            inicio = agora.date()
+            inicio = inicio.replace(day=inicio.day) - __import__("datetime").timedelta(days=inicio.weekday())
+
+            banco = conectar()
+            total = banco.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM recebimentos
+                WHERE TO_DATE(data, 'DD/MM/YYYY')
+                BETWEEN ?::date AND ?::date
+                """,
+                (inicio.isoformat(), agora.date().isoformat())
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Nesta semana foram registrados {total} recebimento(s)."
+
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+        if "ontem" in texto and (
+            any(x in texto for x in ["quantos", "quantas", "quanto", "quantidade"])
+            and any(x in texto for x in ["recebimento", "entrega", "mercadoria"])
+        ):
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            ontem = agora.date() - __import__("datetime").timedelta(days=1)
+            ontem_txt = ontem.strftime("%d/%m/%Y")
+
+            banco = conectar()
+            total = banco.execute(
+                "SELECT COUNT(*) AS total FROM recebimentos WHERE data = ?",
+                (ontem_txt,)
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Ontem foram registrados {total} recebimento(s)."
+
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+        if "ontem" in texto and "volume" in texto:
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            ontem = agora.date() - __import__("datetime").timedelta(days=1)
+            ontem_txt = ontem.strftime("%d/%m/%Y")
+
+            banco = conectar()
+            total = banco.execute(
+                "SELECT COALESCE(SUM(volumes), 0) AS total FROM recebimentos WHERE data = ?",
+                (ontem_txt,)
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Ontem chegaram {total} volume(s)."
+
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+        if "ontem" in texto and "volume" in texto:
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            ontem = agora.date() - __import__("datetime").timedelta(days=1)
+            data = ontem.strftime("%d/%m/%Y")
+
+            banco = conectar()
+            total = banco.execute(
+                "SELECT COALESCE(SUM(volumes),0) AS total FROM recebimentos WHERE data = ?",
+                (data,)
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Ontem chegaram {total} volume(s)."
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta,
+                mensagem=mensagem, resultados=[],
+                arquivo_formato=None, arquivo_periodo=None
+            )
+
+        if "semana" in texto and "volume" in texto:
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            inicio = agora.date() - __import__("datetime").timedelta(days=agora.weekday())
+
+            banco = conectar()
+            total = banco.execute(
+                """SELECT COALESCE(SUM(volumes),0) AS total
+                   FROM recebimentos
+                   WHERE TO_DATE(data,'DD/MM/YYYY') BETWEEN ?::date AND ?::date""",
+                (inicio.isoformat(), agora.date().isoformat())
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Nesta semana chegaram {total} volume(s)."
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta,
+                mensagem=mensagem, resultados=[],
+                arquivo_formato=None, arquivo_periodo=None
+            )
+
+        if "mes" in texto and "volume" in texto:
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            inicio = agora.date().replace(day=1)
+
+            banco = conectar()
+            total = banco.execute(
+                """SELECT COALESCE(SUM(volumes),0) AS total
+                   FROM recebimentos
+                   WHERE TO_DATE(data,'DD/MM/YYYY') BETWEEN ?::date AND ?::date""",
+                (inicio.isoformat(), agora.date().isoformat())
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Neste mês chegaram {total} volume(s)."
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta,
+                mensagem=mensagem, resultados=[],
+                arquivo_formato=None, arquivo_periodo=None
+            )
+
+        if "quem" in texto and "mais" in texto and "semana" in texto:
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            inicio = agora.date() - __import__("datetime").timedelta(days=agora.weekday())
+
+            banco = conectar()
+            top = banco.execute(
+                """SELECT funcionario, COUNT(*) AS total
+                   FROM recebimentos
+                   WHERE TO_DATE(data,'DD/MM/YYYY') BETWEEN ?::date AND ?::date
+                   GROUP BY funcionario ORDER BY total DESC LIMIT 1""",
+                (inicio.isoformat(), agora.date().isoformat())
+            ).fetchone()
+            banco.close()
+
+            mensagem = (
+                f"Nesta semana, {top['funcionario']} teve mais recebimentos: {top['total']}."
+                if top else "Não há recebimentos nesta semana."
+            )
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta, mensagem=mensagem,
+                resultados=[], arquivo_formato=None, arquivo_periodo=None
+            )
+
+        if "quem" in texto and "mais" in texto and "mes" in texto:
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            inicio = agora.date().replace(day=1)
+
+            banco = conectar()
+            top = banco.execute(
+                """SELECT funcionario, COUNT(*) AS total
+                   FROM recebimentos
+                   WHERE TO_DATE(data,'DD/MM/YYYY') BETWEEN ?::date AND ?::date
+                   GROUP BY funcionario ORDER BY total DESC LIMIT 1""",
+                (inicio.isoformat(), agora.date().isoformat())
+            ).fetchone()
+            banco.close()
+
+            mensagem = (
+                f"Neste mês, {top['funcionario']} teve mais recebimentos: {top['total']}."
+                if top else "Não há recebimentos neste mês."
+            )
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta, mensagem=mensagem,
+                resultados=[], arquivo_formato=None, arquivo_periodo=None
+            )
+
+        if (
+            any(x in texto for x in ["quantos", "quantas", "quantidade"])
+            and "pendente" in texto
+        ):
+            banco = conectar()
+            total = banco.execute(
+                """SELECT COUNT(*) AS total FROM recebimentos
+                   WHERE COALESCE(conferido,0) = 0"""
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Existem {total} recebimento(s) pendente(s) de conferência."
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta, mensagem=mensagem,
+                resultados=[], arquivo_formato=None, arquivo_periodo=None
+            )
+
+        if "volume" in texto and "hoje" in texto and (" da " in texto or " do " in texto):
+            marcador = " da " if " da " in texto else " do "
+            fornecedor = texto.split(marcador,1)[1]
+            fornecedor = fornecedor.replace(" chegaram hoje","").replace(" chegou hoje","").strip()
+
+            hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")
+            banco = conectar()
+            total = banco.execute(
+                """SELECT COALESCE(SUM(volumes),0) AS total
+                   FROM recebimentos
+                   WHERE data = ? AND fornecedor ILIKE ?""",
+                (hoje, f"%{fornecedor}%")
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Hoje chegaram {total} volume(s) de {fornecedor}."
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta, mensagem=mensagem,
+                resultados=[], arquivo_formato=None, arquivo_periodo=None
+            )
+
+        if "volume" in texto and "mes" in texto and (" da " in texto or " do " in texto):
+            marcador = " da " if " da " in texto else " do "
+            fornecedor = texto.split(marcador,1)[1]
+            fornecedor = fornecedor.replace(" chegaram este mes","").replace(" chegou este mes","").strip()
+
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            inicio = agora.date().replace(day=1)
+
+            banco = conectar()
+            total = banco.execute(
+                """SELECT COALESCE(SUM(volumes),0) AS total
+                   FROM recebimentos
+                   WHERE TO_DATE(data,'DD/MM/YYYY') BETWEEN ?::date AND ?::date
+                   AND fornecedor ILIKE ?""",
+                (inicio.isoformat(), agora.date().isoformat(), f"%{fornecedor}%")
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Neste mês chegaram {total} volume(s) de {fornecedor}."
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta, mensagem=mensagem,
+                resultados=[], arquivo_formato=None, arquivo_periodo=None
+            )
+
+        if "recebimento" in texto and "semana" in texto and (" da " in texto or " do " in texto):
+            marcador = " da " if " da " in texto else " do "
+            fornecedor = texto.split(marcador,1)[1]
+            fornecedor = fornecedor.replace(" desta semana","").replace(" esta semana","").strip()
+
+            agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+            inicio = agora.date() - __import__("datetime").timedelta(days=agora.weekday())
+
+            banco = conectar()
+            resultados = banco.execute(
+                """SELECT * FROM recebimentos
+                   WHERE TO_DATE(data,'DD/MM/YYYY') BETWEEN ?::date AND ?::date
+                   AND fornecedor ILIKE ?
+                   ORDER BY id DESC""",
+                (inicio.isoformat(), agora.date().isoformat(), f"%{fornecedor}%")
+            ).fetchall()
+            banco.close()
+
+            mensagem = f"Encontrei {len(resultados)} recebimento(s) de {fornecedor} nesta semana."
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta, mensagem=mensagem,
+                resultados=resultados, arquivo_formato=None, arquivo_periodo=None
+            )
+
+        if "dia " in texto and any(x in texto for x in ["quantos recebimentos", "quantas entregas"]):
+            import re
+            m = re.search(r"\b(\d{1,2}/\d{1,2}(?:/\d{4})?)\b", texto)
+
+            if m:
+                data_busca = m.group(1)
+                if data_busca.count("/") == 1:
+                    data_busca += f"/{datetime.now(ZoneInfo('America/Sao_Paulo')).year}"
+
+                banco = conectar()
+                total = banco.execute(
+                    "SELECT COUNT(*) AS total FROM recebimentos WHERE data = ?",
+                    (data_busca,)
+                ).fetchone()["total"]
+                banco.close()
+
+                mensagem = f"No dia {data_busca} foram registrados {total} recebimento(s)."
+                return render_template_string(
+                    ASSISTENTE_HTML, pergunta=pergunta, mensagem=mensagem,
+                    resultados=[], arquivo_formato=None, arquivo_periodo=None
+                )
+
+        if "volume" in texto and "dia " in texto:
+            import re
+            m = re.search(r"\b(\d{1,2}/\d{1,2}(?:/\d{4})?)\b", texto)
+
+            if m:
+                data_busca = m.group(1)
+                if data_busca.count("/") == 1:
+                    data_busca += f"/{datetime.now(ZoneInfo('America/Sao_Paulo')).year}"
+
+                banco = conectar()
+                total = banco.execute(
+                    "SELECT COALESCE(SUM(volumes),0) AS total FROM recebimentos WHERE data = ?",
+                    (data_busca,)
+                ).fetchone()["total"]
+                banco.close()
+
+                mensagem = f"No dia {data_busca} chegaram {total} volume(s)."
+                return render_template_string(
+                    ASSISTENTE_HTML, pergunta=pergunta, mensagem=mensagem,
+                    resultados=[], arquivo_formato=None, arquivo_periodo=None
+                )
+
+        if "dia " in texto and ("o que chegou" in texto or "mostre" in texto):
+            import re
+            m = re.search(r"\b(\d{1,2}/\d{1,2}(?:/\d{4})?)\b", texto)
+
+            if m:
+                data_busca = m.group(1)
+                if data_busca.count("/") == 1:
+                    data_busca += f"/{datetime.now(ZoneInfo('America/Sao_Paulo')).year}"
+
+                banco = conectar()
+                resultados = banco.execute(
+                    "SELECT * FROM recebimentos WHERE data = ? ORDER BY id DESC",
+                    (data_busca,)
+                ).fetchall()
+                banco.close()
+
+                mensagem = f"Encontrei {len(resultados)} recebimento(s) no dia {data_busca}."
+                return render_template_string(
+                    ASSISTENTE_HTML, pergunta=pergunta, mensagem=mensagem,
+                    resultados=resultados, arquivo_formato=None, arquivo_periodo=None
+                )
 
         numeros = []
         for parte in pergunta.split():
