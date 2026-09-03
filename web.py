@@ -1387,6 +1387,9 @@ def filtro_periodo(periodo):
 
 @app.route("/assistente", methods=["GET","POST"])
 def assistente():
+    if not session.get("usuario"):
+        return redirect(url_for("login"))
+
     pergunta = ""
     mensagem = None
     arquivo_formato = None
@@ -3251,6 +3254,9 @@ def inicio():
 
 @app.route("/registrar", methods=["POST"])
 def registrar():
+    if not session.get("usuario"):
+        return redirect(url_for("login"))
+
     fornecedor = request.form["fornecedor"].strip()
     nota_fiscal = request.form["nota_fiscal"].strip()
     data_nf = request.form.get("data_nf", "").strip()
