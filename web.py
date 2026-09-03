@@ -3474,7 +3474,12 @@ button {
 
         <div class="info">
 
-            <strong>Recebido por:</strong> {{ registro['funcionario'] }}<br>
+            {% if session.get("usuario") == "ADMIN" %}
+<label>Recebido por</label>
+<input name="funcionario" value="{{ registro['funcionario'] or '' }}">
+{% else %}
+<strong>Recebido por:</strong> {{ registro['funcionario'] }}<br>
+{% endif %}
 
             <strong>Data:</strong> {{ registro['data'] }} às {{ registro['hora'] }}
 
@@ -3532,6 +3537,14 @@ def editar_recebimento(id):
 
         volumes = int(volumes_txt) if volumes_txt else None
 
+        if session.get("usuario") == "ADMIN":
+            funcionario = request.form.get(
+                "funcionario",
+                registro["funcionario"] or ""
+            ).strip()
+        else:
+            funcionario = registro["funcionario"]
+
         banco.execute(
 
             """
@@ -3569,6 +3582,11 @@ def editar_recebimento(id):
         banco.commit()
 
         alteracoes = []
+
+        if registro["funcionario"] != funcionario:
+            alteracoes.append(
+                f'Recebido por: {registro["funcionario"]} -> {funcionario}'
+            )
 
         if registro["fornecedor"] != fornecedor:
             alteracoes.append(f'Fornecedor: {registro["fornecedor"]} -> {fornecedor}')
