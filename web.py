@@ -534,6 +534,11 @@ label {
             <div style="font-size:13px;opacity:.8;">✅ Conferidos</div>
             <div style="font-size:28px;font-weight:bold;">{{ total_conferidos }}</div>
         </div>
+
+        <div style="background:#111827;color:white;padding:16px;border-radius:12px;grid-column:1/-1;">
+            <div style="font-size:13px;opacity:.8;">📦 Volumes recebidos hoje</div>
+            <div style="font-size:28px;font-weight:bold;">{{ volumes_hoje }}</div>
+        </div>
     </div>
 
     <div class="card">
@@ -1651,6 +1656,11 @@ def inicio():
         "SELECT COUNT(*) AS total FROM recebimentos WHERE conferido = 1"
     ).fetchone()["total"]
 
+    volumes_hoje = banco.execute(
+        "SELECT COALESCE(SUM(volumes), 0) AS total FROM recebimentos WHERE data = ?",
+        (hoje.strftime("%d/%m/%Y"),)
+    ).fetchone()["total"]
+
     banco.close()
 
     return render_template_string(
@@ -1661,7 +1671,8 @@ def inicio():
         total_hoje=total_hoje,
         total_semana=total_semana,
         total_pendentes=total_pendentes,
-        total_conferidos=total_conferidos
+        total_conferidos=total_conferidos,
+        volumes_hoje=volumes_hoje
     )
 
 
