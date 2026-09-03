@@ -2053,6 +2053,40 @@ def assistente():
                 arquivo_formato=None, arquivo_periodo=None
             )
 
+        if (
+            ("quem" in texto or "funcionario" in texto)
+            and "mais" in texto
+            and "recebimento" in texto
+        ):
+            where, params = filtro_periodo(periodo_detectado)
+
+            banco = conectar()
+            top = banco.execute(
+                """SELECT funcionario, COUNT(*) AS total,
+                          COALESCE(SUM(volumes),0) AS volumes
+                   FROM recebimentos""" + where + """
+                   GROUP BY funcionario
+                   ORDER BY total DESC, volumes DESC
+                   LIMIT 1""",
+                params
+            ).fetchone()
+            banco.close()
+
+            if top:
+                mensagem = (
+                    f"{top['funcionario']} recebeu mais: "
+                    f"{top['total']} recebimento(s), "
+                    f"somando {top['volumes']} volume(s)."
+                )
+            else:
+                mensagem = "Não encontrei recebimentos."
+
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta,
+                mensagem=mensagem, resultados=[],
+                arquivo_formato=None, arquivo_periodo=None
+            )
+
         numeros = []
         for parte in pergunta.split():
             numero = "".join(c for c in parte if c.isdigit())
