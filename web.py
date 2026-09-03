@@ -1601,13 +1601,45 @@ def inicio():
             LIMIT 100
         """).fetchall()
 
+    hoje = datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+    inicio_semana = hoje.date().fromordinal(
+        hoje.date().toordinal() - hoje.weekday()
+    )
+
+    total_hoje = banco.execute(
+        "SELECT COUNT(*) AS total FROM recebimentos WHERE data = ?",
+        (hoje.strftime("%d/%m/%Y"),)
+    ).fetchone()["total"]
+
+    total_semana = banco.execute(
+        """
+        SELECT COUNT(*) AS total
+        FROM recebimentos
+        WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN ?::date AND ?::date
+        """,
+        (inicio_semana.isoformat(), hoje.date().isoformat())
+    ).fetchone()["total"]
+
+    total_pendentes = banco.execute(
+        "SELECT COUNT(*) AS total FROM recebimentos WHERE conferido = 0"
+    ).fetchone()["total"]
+
+    total_conferidos = banco.execute(
+        "SELECT COUNT(*) AS total FROM recebimentos WHERE conferido = 1"
+    ).fetchone()["total"]
+
     banco.close()
 
     return render_template_string(
         HTML,
         registros=registros,
         pesquisa=pesquisa,
-        sugestoes=sugestoes
+        sugestoes=sugestoes,
+        total_hoje=total_hoje,
+        total_semana=total_semana,
+        total_pendentes=total_pendentes,
+        total_conferidos=total_conferidos
     )
 
 
