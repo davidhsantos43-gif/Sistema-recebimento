@@ -508,6 +508,18 @@ label {
 </a>
 {% endif %}
 
+<a href="/assistente"
+   style="display:flex;align-items:center;justify-content:center;
+          width:100%;min-height:54px;
+          background:#111827;color:white;
+          padding:14px 18px;border-radius:9px;
+          text-decoration:none;margin:0 0 22px;
+          font-weight:bold;font-size:16px;
+          border:1px solid rgba(255,255,255,.18);
+          box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
+    🤖 ASSISTENTE
+</a>
+
         <p>Registro e acompanhamento de entregas</p>
     </div>
 </div>
