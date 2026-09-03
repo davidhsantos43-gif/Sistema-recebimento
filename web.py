@@ -1295,7 +1295,6 @@ Conferido em: {{ r["conferido_em"] or "-" }}
 </html>
 """
 
-@app.route("/assistente", methods=["GET","POST"])
 def entender_pergunta(texto):
     texto = normalizar_texto(texto)
     texto = texto.replace("+", " mais ")
@@ -1386,6 +1385,7 @@ def filtro_periodo(periodo):
     )
 
 
+@app.route("/assistente", methods=["GET","POST"])
 def assistente():
     pergunta = ""
     mensagem = None
