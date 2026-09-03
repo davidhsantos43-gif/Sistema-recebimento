@@ -12,6 +12,31 @@ def normalizar_texto(texto):
     texto = texto.lower().strip()
 
     trocas = {
+        "q": "que",
+        "oq": "o que",
+        "oqe": "o que",
+        "qnts": "quantos",
+        "qntas": "quantas",
+        "qto": "quanto",
+        "qta": "quantidade",
+        "qtos": "quantos",
+        "qtas": "quantas",
+        "qtds": "quantidade",
+        "total": "quantidade",
+        "mostra": "mostrar",
+        "mostre": "mostrar",
+        "qm": "quem",
+        "qnt": "quanto",
+        "qnts": "quantos",
+        "ent": "entrega",
+        "entregas": "entrega",
+        "recebimentos": "recebimento",
+        "mercadorias": "mercadoria",
+        "pendentes": "pendente",
+        "conferidos": "conferido",
+        "merc": "mercadoria",
+        "sem": "semana",
+        "semanal": "semana",
         "hj": "hoje",
         "qtd": "quantidade",
         "qnts": "quantos",
@@ -19,6 +44,9 @@ def normalizar_texto(texto):
         "nf": "nota fiscal",
         "nfs": "notas fiscais",
     }
+
+    for c in "?!,;:":
+        texto = texto.replace(c, " ")
 
     palavras = texto.split()
     palavras = [trocas.get(p, p) for p in palavras]
@@ -1268,6 +1296,96 @@ Conferido em: {{ r["conferido_em"] or "-" }}
 """
 
 @app.route("/assistente", methods=["GET","POST"])
+def entender_pergunta(texto):
+    texto = normalizar_texto(texto)
+    texto = texto.replace("+", " mais ")
+
+    trocas = {
+        "hj": "hoje",
+        "mes": "mes",
+        "mensal": "mes",
+        "ont": "ontem",
+        "ontm": "ontem",
+        "qtd": "quantidade",
+        "qtde": "quantidade",
+        "qnts": "quantos",
+        "nf": "nota",
+        "nfs": "notas",
+        "rec": "recebimento",
+        "receb": "recebimento",
+        "forn": "fornecedor",
+        "func": "funcionario",
+        "pend": "pendente",
+        "conf": "conferido",
+        "vol": "volume",
+        "vols": "volumes",
+        "volumes": "volume",
+        "recebe": "recebimento",
+        "recebi": "recebimento",
+        "receb": "recebimento",
+        "entr": "recebimento",
+    }
+
+    palavras = texto.split()
+    texto = " ".join(trocas.get(p, p) for p in palavras)
+
+    sinonimos = {
+        "entrega": "recebimento",
+        "mercadoria": "recebimento",
+        "recebido": "recebimento",
+        "recebeu": "recebimento",
+        "receberam": "recebimento",
+    }
+
+    palavras = texto.split()
+    return " ".join(sinonimos.get(p, p) for p in palavras)
+
+
+def detectar_periodo(texto):
+    if "ontem" in texto:
+        return "ontem"
+    if "hoje" in texto:
+        return "hoje"
+    if "semana" in texto:
+        return "semana"
+    if "mes" in texto:
+        return "mes"
+    return None
+
+
+def datas_periodo(periodo):
+    agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+    hoje = agora.date()
+
+    if periodo == "hoje":
+        return hoje, hoje
+    if periodo == "ontem":
+        ontem = hoje - __import__("datetime").timedelta(days=1)
+        return ontem, ontem
+    if periodo == "semana":
+        inicio = hoje - __import__("datetime").timedelta(days=hoje.weekday())
+        return inicio, hoje
+    if periodo == "mes":
+        return hoje.replace(day=1), hoje
+
+    return None, None
+
+
+def filtro_periodo(periodo):
+    inicio, fim = datas_periodo(periodo)
+
+    if not inicio:
+        return "", ()
+
+    if inicio == fim:
+        return " WHERE data = ?", (inicio.strftime("%d/%m/%Y"),)
+
+    return (
+        " WHERE TO_DATE(data, 'DD/MM/YYYY') BETWEEN ?::date AND ?::date",
+        (inicio.isoformat(), fim.isoformat())
+    )
+
+
 def assistente():
     pergunta = ""
     mensagem = None
@@ -1277,7 +1395,8 @@ def assistente():
 
     if request.method == "POST":
         pergunta = request.form.get("pergunta", "").strip()
-        texto = normalizar_texto(pergunta)
+        texto = entender_pergunta(pergunta)
+        periodo_detectado = detectar_periodo(texto)
         if "pdf" in texto:
             arquivo_formato = "pdf"
         elif "excel" in texto or "xlsx" in texto:
@@ -1381,10 +1500,8 @@ def assistente():
             )
 
         if "hoje" in texto and (
-            "quem recebeu mais" in texto
-            or "quem mais recebeu" in texto
-            or "qual funcionario recebeu mais" in texto
-            or "quem teve mais recebimentos" in texto
+            ("quem" in texto and "mais" in texto and "recebimento" in texto)
+            or ("funcionario" in texto and "mais" in texto and "recebimento" in texto)
         ):
             hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")
 
@@ -1837,6 +1954,104 @@ def assistente():
                     ASSISTENTE_HTML, pergunta=pergunta, mensagem=mensagem,
                     resultados=resultados, arquivo_formato=None, arquivo_periodo=None
                 )
+
+        if (
+            periodo_detectado
+            and "recebimento" in texto
+            and any(x in texto for x in ["quantos", "quantas", "quanto", "quantidade"])
+        ):
+            where, params = filtro_periodo(periodo_detectado)
+
+            banco = conectar()
+            total = banco.execute(
+                "SELECT COUNT(*) AS total FROM recebimentos" + where,
+                params
+            ).fetchone()["total"]
+            banco.close()
+
+            nomes = {
+                "hoje": "Hoje",
+                "ontem": "Ontem",
+                "semana": "Nesta semana",
+                "mes": "Neste mês"
+            }
+
+            mensagem = f"{nomes[periodo_detectado]} foram registrados {total} recebimento(s)."
+
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+        if periodo_detectado and "volume" in texto:
+            where, params = filtro_periodo(periodo_detectado)
+
+            banco = conectar()
+            total = banco.execute(
+                "SELECT COALESCE(SUM(volumes),0) AS total FROM recebimentos" + where,
+                params
+            ).fetchone()["total"]
+            banco.close()
+
+            nomes = {
+                "hoje": "Hoje",
+                "ontem": "Ontem",
+                "semana": "Nesta semana",
+                "mes": "Neste mês"
+            }
+
+            mensagem = f"{nomes[periodo_detectado]} chegaram {total} volume(s)."
+
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta,
+                mensagem=mensagem, resultados=[],
+                arquivo_formato=None, arquivo_periodo=None
+            )
+
+        if (
+            periodo_detectado
+            and "mais" in texto
+            and ("quem" in texto or "funcionario" in texto)
+            and "recebimento" in texto
+        ):
+            where, params = filtro_periodo(periodo_detectado)
+
+            banco = conectar()
+            top = banco.execute(
+                """SELECT funcionario, COUNT(*) AS total,
+                          COALESCE(SUM(volumes),0) AS volumes
+                   FROM recebimentos""" + where + """
+                   GROUP BY funcionario
+                   ORDER BY total DESC, volumes DESC
+                   LIMIT 1""",
+                params
+            ).fetchone()
+            banco.close()
+
+            nomes = {
+                "hoje": "Hoje",
+                "ontem": "Ontem",
+                "semana": "Nesta semana",
+                "mes": "Neste mês"
+            }
+
+            if top:
+                mensagem = (
+                    f"{nomes[periodo_detectado]}, {top['funcionario']} recebeu mais: "
+                    f"{top['total']} recebimento(s), somando {top['volumes']} volume(s)."
+                )
+            else:
+                mensagem = f"{nomes[periodo_detectado]} não houve recebimentos."
+
+            return render_template_string(
+                ASSISTENTE_HTML, pergunta=pergunta,
+                mensagem=mensagem, resultados=[],
+                arquivo_formato=None, arquivo_periodo=None
+            )
 
         numeros = []
         for parte in pergunta.split():
