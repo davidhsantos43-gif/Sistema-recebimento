@@ -1067,7 +1067,13 @@ a {
    <form method="POST" action="/usuarios/excluir/{{ u['id'] }}" onsubmit="return confirm('Tem certeza que deseja excluir este usuC!rio?');">
     <button type="submit" style="width:auto; padding:6px 12px; display:inline-block;">Excluir</button>
 </form>
-        <form method="POST" action="/usuarios/senha/{{ u['id'] }}" style="margin-top:8px;"><input type="password" name="senha" placeholder="Nova senha" required style="width:auto;padding:6px 12px;margin-right:6px;"><button type="submit" style="width:auto;padding:6px 12px;">Alterar senha</button></form>
+        {% if session.get("usuario") == "ADMIN" %}
+        <form method="POST" action="/usuarios/senha/{{ u['id'] }}" style="margin-top:8px;">
+            <input type="password" name="senha_admin" placeholder="Senha atual do ADMIN" required style="width:auto;padding:6px 12px;margin-right:6px;">
+            <input type="password" name="senha" placeholder="Nova senha" required style="width:auto;padding:6px 12px;margin-right:6px;">
+            <button type="submit" style="width:auto;padding:6px 12px;">Alterar senha</button>
+        </form>
+        {% endif %}
     </div>
     {% endfor %}
 
@@ -1157,27 +1163,40 @@ def excluir_usuario(id_usuario):
 
 @app.route("/usuarios/senha/<int:id_usuario>", methods=["POST"])
 def alterar_senha_usuario(id_usuario):
-    if session.get("nivel") != "admin":
+    if session.get("usuario") != "ADMIN":
         return redirect(url_for("inicio"))
 
-    senha = request.form.get("senha", "")
-    if not senha:
-        return redirect(url_for("usuarios"))
+    senha_admin = request.form.get("senha_admin", "")
+    nova_senha = request.form.get("senha", "")
 
     banco = conectar()
+
+    admin = banco.execute(
+        "SELECT senha FROM usuarios WHERE usuario = ?",
+        ("ADMIN",)
+    ).fetchone()
+
+    if not admin or not check_password_hash(admin["senha"], senha_admin):
+        banco.close()
+        return redirect(url_for("usuarios"))
+
+    if not nova_senha:
+        banco.close()
+        return redirect(url_for("usuarios"))
+
     banco.execute(
         "UPDATE usuarios SET senha = ? WHERE id = ?",
-        (generate_password_hash(senha), id_usuario)
+        (generate_password_hash(nova_senha), id_usuario)
     )
     banco.commit()
     banco.close()
 
     registrar_log(
-        session.get("usuario"),
+        "ADMIN",
         "ALTEROU SENHA",
         "usuario",
         id_usuario,
-        "Senha alterada"
+        "Senha alterada pelo ADMIN"
     )
 
     return redirect(url_for("usuarios"))
