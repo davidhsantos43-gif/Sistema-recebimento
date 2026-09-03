@@ -1235,10 +1235,34 @@ Conferido em: {{ r["conferido_em"] or "-" }}
 def assistente():
     pergunta = ""
     mensagem = None
+    arquivo_formato = None
+    arquivo_periodo = None
     resultados = []
 
     if request.method == "POST":
         pergunta = request.form.get("pergunta", "").strip()
+        texto = pergunta.lower()
+        if "pdf" in texto:
+            arquivo_formato = "pdf"
+        elif "excel" in texto or "xlsx" in texto:
+            arquivo_formato = "xlsx"
+        elif "word" in texto or "docx" in texto:
+            arquivo_formato = "docx"
+        elif "zip" in texto or "backup" in texto:
+            arquivo_formato = "zip"
+        if "hoje" in texto:
+            arquivo_periodo = "hoje"
+        elif "semana" in texto:
+            arquivo_periodo = "semana"
+        elif "mes" in texto or "mês" in texto:
+            arquivo_periodo = "mes"
+        elif "tudo" in texto or "completo" in texto:
+            arquivo_periodo = "tudo"
+
+        if arquivo_formato and arquivo_periodo:
+            return redirect(
+                f"/relatorios/gerar?formato={arquivo_formato}&periodo={arquivo_periodo}"
+            )
 
         numeros = []
         for parte in pergunta.split():
@@ -1394,13 +1418,13 @@ def relatorios():
 
 
 
-@app.route("/relatorios/gerar", methods=["POST"])
+@app.route("/relatorios/gerar", methods=["GET","POST"])
 def gerar_relatorio():
     if session.get("usuario") != "ADMIN":
         return redirect(url_for("inicio"))
 
-    periodo = request.form.get("periodo", "tudo")
-    formato = request.form.get("formato", "xlsx")
+    periodo = request.values.get("periodo", "tudo")
+    formato = request.values.get("formato", "xlsx")
 
     agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
     banco = conectar()
