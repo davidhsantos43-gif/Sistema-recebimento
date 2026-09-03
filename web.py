@@ -1067,6 +1067,7 @@ a {
    <form method="POST" action="/usuarios/excluir/{{ u['id'] }}" onsubmit="return confirm('Tem certeza que deseja excluir este usuC!rio?');">
     <button type="submit" style="width:auto; padding:6px 12px; display:inline-block;">Excluir</button>
 </form>
+        <form method="POST" action="/usuarios/senha/{{ u['id'] }}" style="margin-top:8px;"><input type="password" name="senha" placeholder="Nova senha" required style="width:auto;padding:6px 12px;margin-right:6px;"><button type="submit" style="width:auto;padding:6px 12px;">Alterar senha</button></form>
     </div>
     {% endfor %}
 
