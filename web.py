@@ -516,22 +516,22 @@ label {
 
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:18px;">
         <div style="background:#111827;color:white;padding:16px;border-radius:12px;">
-            <div style="font-size:13px;opacity:.8;">📦 Hoje</div>
+            <div style="font-size:13px;opacity:.8;">📦 Hoje <a href="/?filtro=hoje" style="float:right;color:white;font-weight:bold;">Ver</a></div>
             <div style="font-size:28px;font-weight:bold;">{{ total_hoje }}</div>
         </div>
 
         <div style="background:#111827;color:white;padding:16px;border-radius:12px;">
-            <div style="font-size:13px;opacity:.8;">📅 Esta semana</div>
+            <div style="font-size:13px;opacity:.8;">📅 Esta semana <a href="/?filtro=semana" style="float:right;color:white;font-weight:bold;">Ver</a></div>
             <div style="font-size:28px;font-weight:bold;">{{ total_semana }}</div>
         </div>
 
         <div style="background:#111827;color:white;padding:16px;border-radius:12px;">
-            <div style="font-size:13px;opacity:.8;">⏳ Pendentes</div>
+            <div style="font-size:13px;opacity:.8;">⏳ Pendentes <a href="/?filtro=pendentes" style="float:right;color:white;font-weight:bold;">Ver</a></div>
             <div style="font-size:28px;font-weight:bold;">{{ total_pendentes }}</div>
         </div>
 
         <div style="background:#111827;color:white;padding:16px;border-radius:12px;">
-            <div style="font-size:13px;opacity:.8;">✅ Conferidos</div>
+            <div style="font-size:13px;opacity:.8;">✅ Conferidos <a href="/?filtro=conferidos" style="float:right;color:white;font-weight:bold;">Ver</a></div>
             <div style="font-size:28px;font-weight:bold;">{{ total_conferidos }}</div>
         </div>
 
@@ -540,6 +540,17 @@ label {
             <div style="font-size:28px;font-weight:bold;">{{ volumes_hoje }}</div>
         </div>
     </div>
+
+    {% if filtro %}
+    <div style="margin-bottom:14px;padding:12px 14px;background:#e5e7eb;border-radius:10px;font-weight:bold;">
+        Filtro ativo:
+        {% if filtro == "hoje" %}Hoje{% endif %}
+        {% if filtro == "semana" %}Esta semana{% endif %}
+        {% if filtro == "pendentes" %}Pendentes{% endif %}
+        {% if filtro == "conferidos" %}Conferidos{% endif %}
+        <a href="/" style="float:right;color:#111827;">Limpar filtro</a>
+    </div>
+    {% endif %}
 
     <div class="card">
         <h2>Novo recebimento</h2>
@@ -1596,6 +1607,7 @@ def toggle_observacao(id):
 @app.route("/")
 def inicio():
     pesquisa = request.args.get("q", "").strip()
+    filtro = request.args.get("filtro", "").strip()
 
     banco = conectar()
 
@@ -1606,7 +1618,55 @@ def inicio():
         ORDER BY texto
     """).fetchall()
 
-    if pesquisa:
+    if filtro == "hoje":
+        registros = banco.execute(
+            """
+            SELECT *
+            FROM recebimentos
+            WHERE data = ?
+            ORDER BY id DESC
+            """,
+            (datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y"),)
+        ).fetchall()
+
+    elif filtro == "semana":
+        agora_filtro = datetime.now(ZoneInfo("America/Sao_Paulo"))
+        inicio_filtro = agora_filtro.date().fromordinal(
+            agora_filtro.date().toordinal() - agora_filtro.weekday()
+        )
+
+        registros = banco.execute(
+            """
+            SELECT *
+            FROM recebimentos
+            WHERE TO_DATE(data, 'DD/MM/YYYY')
+            BETWEEN ?::date AND ?::date
+            ORDER BY id DESC
+            """,
+            (inicio_filtro.isoformat(), agora_filtro.date().isoformat())
+        ).fetchall()
+
+    elif filtro == "pendentes":
+        registros = banco.execute(
+            """
+            SELECT *
+            FROM recebimentos
+            WHERE conferido = 0
+            ORDER BY id DESC
+            """
+        ).fetchall()
+
+    elif filtro == "conferidos":
+        registros = banco.execute(
+            """
+            SELECT *
+            FROM recebimentos
+            WHERE conferido = 1
+            ORDER BY id DESC
+            """
+        ).fetchall()
+
+    elif pesquisa:
         registros = banco.execute("""
             SELECT *
             FROM recebimentos
@@ -1668,6 +1728,7 @@ def inicio():
         registros=registros,
         pesquisa=pesquisa,
         sugestoes=sugestoes,
+        filtro=filtro,
         total_hoje=total_hoje,
         total_semana=total_semana,
         total_pendentes=total_pendentes,
