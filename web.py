@@ -1182,34 +1182,6 @@ def alterar_senha_usuario(id_usuario):
     return redirect(url_for("usuarios"))
 
 
-@app.route("/usuarios/senha/<int:id_usuario>", methods=["POST"])
-def alterar_senha_usuario(id_usuario):
-    if session.get("nivel") != "admin":
-        return redirect(url_for("inicio"))
-
-    senha = request.form.get("senha", "")
-    if not senha:
-        return redirect(url_for("usuarios"))
-
-    banco = conectar()
-    banco.execute(
-        "UPDATE usuarios SET senha = ? WHERE id = ?",
-        (generate_password_hash(senha), id_usuario)
-    )
-    banco.commit()
-    banco.close()
-
-    registrar_log(
-        session.get("usuario"),
-        "ALTEROU SENHA",
-        "usuario",
-        id_usuario,
-        "Senha alterada"
-    )
-
-    return redirect(url_for("usuarios"))
-
-
 @app.route("/conferir/<int:id_recebimento>", methods=["POST"])
 def conferir_recebimento(id_recebimento):
     if "usuario" not in session:
