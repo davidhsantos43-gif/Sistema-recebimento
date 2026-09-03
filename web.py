@@ -1,4 +1,5 @@
-from flask import Flask, request, redirect, render_template_string, session, url_for
+from flask import Flask, request, redirect, render_template_string, session, url_for, send_file
+from io import BytesIO
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -1141,6 +1142,7 @@ body {
 <a class="opcao" href="/usuarios">Gerenciar usuários</a>
 <a class="opcao" href="/observacoes">Gerenciar observações</a>
 <a class="opcao" href="/logs">Logs do sistema</a>
+<a class="opcao" href="/relatorios">📦 Relatórios e Backups</a>
 
 <h2>Acesso aos logs</h2>
 
@@ -1269,6 +1271,266 @@ def assistente():
         pergunta=pergunta,
         mensagem=mensagem,
         resultados=resultados
+    )
+
+
+
+RELATORIOS_HTML = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatórios e Backups</title>
+<style>
+body{
+    font-family:Arial,sans-serif;
+    background:#f3f4f6;
+    margin:0;
+    padding:20px;
+    color:#111827;
+}
+.caixa{
+    max-width:700px;
+    margin:30px auto;
+    background:white;
+    padding:25px;
+    border-radius:14px;
+}
+h1{margin-top:0;}
+label{
+    display:block;
+    font-weight:bold;
+    margin:18px 0 8px;
+}
+select{
+    width:100%;
+    padding:14px;
+    border:1px solid #d1d5db;
+    border-radius:9px;
+    font-size:16px;
+}
+.formatos{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+    margin-top:12px;
+}
+.formato{
+    background:#111827;
+    color:white;
+    border:0;
+    padding:15px;
+    border-radius:9px;
+    font-weight:bold;
+    font-size:15px;
+}
+.voltar{
+    display:inline-block;
+    margin-top:22px;
+    background:#111827;
+    color:white;
+    padding:12px 16px;
+    border-radius:9px;
+    text-decoration:none;
+    font-weight:bold;
+}
+.aviso{
+    margin-top:18px;
+    background:#f3f4f6;
+    padding:14px;
+    border-radius:9px;
+}
+</style>
+</head>
+<body>
+
+<div class="caixa">
+<h1>📦 Relatórios e Backups</h1>
+<p>Escolha o período e o formato desejado.</p>
+
+<form method="POST" action="/relatorios/gerar">
+
+<label>Período</label>
+<select name="periodo">
+    <option value="hoje">Hoje</option>
+    <option value="semana">Esta semana</option>
+    <option value="mes">Este mês</option>
+    <option value="tudo">Todos os recebimentos</option>
+</select>
+
+<label>Formato</label>
+
+<div class="formatos">
+    <button class="formato" name="formato" value="xlsx">📊 Excel</button>
+    <button class="formato" name="formato" value="pdf">📄 PDF</button>
+    <button class="formato" name="formato" value="docx">📝 Word</button>
+    <button class="formato" name="formato" value="csv">📋 CSV</button>
+    <button class="formato" name="formato" value="zip"
+            style="grid-column:1/-1;">
+        📦 Backup ZIP
+    </button>
+</div>
+
+</form>
+
+<div class="aviso">
+Os arquivos serão gerados diretamente a partir dos dados salvos no banco.
+</div>
+
+<a class="voltar" href="/configuracoes">← Voltar</a>
+</div>
+
+</body>
+</html>
+"""
+
+@app.route("/relatorios")
+def relatorios():
+    if session.get("usuario") != "ADMIN":
+        return redirect(url_for("inicio"))
+
+    return render_template_string(RELATORIOS_HTML)
+
+
+
+@app.route("/relatorios/gerar", methods=["POST"])
+def gerar_relatorio():
+    if session.get("usuario") != "ADMIN":
+        return redirect(url_for("inicio"))
+
+    periodo = request.form.get("periodo", "tudo")
+    formato = request.form.get("formato", "xlsx")
+
+    if formato != "xlsx":
+        return "Este formato será ativado no próximo passo.", 400
+
+    agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
+    banco = conectar()
+
+    if periodo == "hoje":
+        registros = banco.execute(
+            """
+            SELECT *
+            FROM recebimentos
+            WHERE data = ?
+            ORDER BY id DESC
+            """,
+            (agora.strftime("%d/%m/%Y"),)
+        ).fetchall()
+
+        nome_periodo = "hoje"
+
+    elif periodo == "semana":
+        inicio = agora.date().fromordinal(
+            agora.date().toordinal() - agora.weekday()
+        )
+
+        registros = banco.execute(
+            """
+            SELECT *
+            FROM recebimentos
+            WHERE TO_DATE(data, 'DD/MM/YYYY')
+            BETWEEN ?::date AND ?::date
+            ORDER BY id DESC
+            """,
+            (inicio.isoformat(), agora.date().isoformat())
+        ).fetchall()
+
+        nome_periodo = "semana"
+
+    elif periodo == "mes":
+        inicio = agora.replace(day=1).date()
+
+        registros = banco.execute(
+            """
+            SELECT *
+            FROM recebimentos
+            WHERE TO_DATE(data, 'DD/MM/YYYY')
+            BETWEEN ?::date AND ?::date
+            ORDER BY id DESC
+            """,
+            (inicio.isoformat(), agora.date().isoformat())
+        ).fetchall()
+
+        nome_periodo = "mes"
+
+    else:
+        registros = banco.execute(
+            """
+            SELECT *
+            FROM recebimentos
+            ORDER BY id DESC
+            """
+        ).fetchall()
+
+        nome_periodo = "completo"
+
+    banco.close()
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Recebimentos"
+
+    cabecalhos = [
+        "ID",
+        "Fornecedor",
+        "Nota Fiscal",
+        "Data da NF",
+        "Volumes",
+        "Recebido por",
+        "Observação",
+        "Data do recebimento",
+        "Hora",
+        "Status",
+        "Conferido por",
+        "Conferido em"
+    ]
+
+    ws.append(cabecalhos)
+
+    for celula in ws[1]:
+        celula.font = Font(bold=True)
+        celula.alignment = Alignment(horizontal="center")
+
+    for r in registros:
+        ws.append([
+            r["id"],
+            r["fornecedor"] or "",
+            r["nota_fiscal"] or "",
+            r["data_nf"] or "",
+            r["volumes"] or 0,
+            r["funcionario"] or "",
+            r["observacao"] or "",
+            r["data"] or "",
+            r["hora"] or "",
+            "Conferido" if r["conferido"] else "Pendente",
+            r["conferido_por"] or "",
+            r["conferido_em"] or ""
+        ])
+
+    larguras = [8, 24, 18, 16, 12, 20, 35, 20, 14, 15, 20, 20]
+
+    for i, largura in enumerate(larguras, 1):
+        ws.column_dimensions[get_column_letter(i)].width = largura
+
+    ws.freeze_panes = "A2"
+
+    arquivo = BytesIO()
+    wb.save(arquivo)
+    arquivo.seek(0)
+
+    nome = f"recebimentos_{nome_periodo}_{agora.strftime('%d-%m-%Y')}.xlsx"
+
+    return send_file(
+        arquivo,
+        as_attachment=True,
+        download_name=nome,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
 
