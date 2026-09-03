@@ -83,6 +83,9 @@ def criar_banco():
         )
     """)
 
+    banco.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS pode_ver_logs INTEGER NOT NULL DEFAULT 0")
+    banco.execute("UPDATE usuarios SET pode_ver_logs = 1 WHERE usuario = 'ADMIN'")
+
     banco.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id SERIAL PRIMARY KEY,
@@ -469,6 +472,16 @@ label {
    box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
     GERENCIAR USUÁRIOS
 </a>
+
+{% if session.get("usuario") == "ADMIN" %}
+<a href="/configuracoes"
+   style="display:flex;align-items:center;justify-content:center;
+   width:100%;min-height:54px;background:#111827;color:white;
+   padding:14px 18px;border-radius:9px;text-decoration:none;
+   margin:0 0 22px;font-weight:bold;font-size:16px;">
+    ⚙️ CONFIGURAÇÕES
+</a>
+{% endif %}
 
 <a href="/logs"
    style="display:flex;align-items:center;justify-content:center;
@@ -996,6 +1009,99 @@ def logs_sistema():
     banco.close()
 
     return render_template_string(LOGS_HTML, logs=logs)
+
+
+
+CONFIGURACOES_HTML = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configurações</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background:#f3f4f6;
+    margin:0;
+    padding:20px;
+}
+.caixa {
+    max-width:700px;
+    margin:30px auto;
+    background:white;
+    padding:25px;
+    border-radius:12px;
+}
+.opcao {
+    display:block;
+    padding:16px;
+    margin:12px 0;
+    background:#111827;
+    color:white;
+    text-decoration:none;
+    border-radius:9px;
+    font-weight:bold;
+}
+</style>
+</head>
+<body>
+<div class="caixa">
+<h1>⚙️ Configurações</h1>
+
+<a class="opcao" href="/usuarios">Gerenciar usuários</a>
+<a class="opcao" href="/observacoes">Gerenciar observações</a>
+<a class="opcao" href="/logs">Logs do sistema</a>
+
+<h2>Acesso aos logs</h2>
+
+{% for a in admins %}
+<div style="padding:12px 0;border-bottom:1px solid #ddd;">
+    <strong>{{ a["usuario"] }}</strong>
+
+    {% if a["pode_ver_logs"] %}
+        <span> — ✅ Permitido</span>
+        {% if a["usuario"] != "ADMIN" %}
+        <form method="POST" action="/configuracoes/logs/{{ a['id'] }}/0" style="display:inline;">
+            <button type="submit">Bloquear</button>
+        </form>
+        {% endif %}
+    {% else %}
+        <span> — ❌ Bloqueado</span>
+        <form method="POST" action="/configuracoes/logs/{{ a['id'] }}/1" style="display:inline;">
+            <button type="submit">Permitir</button>
+        </form>
+    {% endif %}
+</div>
+{% endfor %}
+
+
+<a href="/">Voltar ao sistema</a>
+</div>
+</body>
+</html>
+"""
+
+@app.route("/configuracoes")
+def configuracoes():
+    if session.get("usuario") != "ADMIN":
+        return redirect(url_for("inicio"))
+
+    banco = conectar()
+    admins = banco.execute(
+        """
+        SELECT id, usuario, pode_ver_logs
+        FROM usuarios
+        WHERE nivel = 'admin'
+        ORDER BY usuario
+        """
+    ).fetchall()
+    banco.close()
+
+    return render_template_string(
+        CONFIGURACOES_HTML,
+        admins=admins
+    )
 
 
 USUARIOS_HTML = """
@@ -1905,3 +2011,28 @@ if __name__ == "__main__":
         port=5000,
         debug=False
     )
+
+@app.route("/configuracoes/logs/<int:id_usuario>/<int:valor>", methods=["POST"])
+def configurar_acesso_logs(id_usuario, valor):
+    if session.get("usuario") != "ADMIN":
+        return redirect(url_for("inicio"))
+
+    valor = 1 if valor == 1 else 0
+
+    banco = conectar()
+
+    usuario = banco.execute(
+        "SELECT usuario FROM usuarios WHERE id = ?",
+        (id_usuario,)
+    ).fetchone()
+
+    if usuario and usuario["usuario"] != "ADMIN":
+        banco.execute(
+            "UPDATE usuarios SET pode_ver_logs = ? WHERE id = ?",
+            (valor, id_usuario)
+        )
+        banco.commit()
+
+    banco.close()
+
+    return redirect(url_for("configuracoes"))
