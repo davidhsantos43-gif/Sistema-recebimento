@@ -1576,26 +1576,71 @@ def gerar_relatorio():
 
     if formato == "docx":
         from docx import Document
+        from docx.shared import Inches, Pt
+        from docx.enum.section import WD_ORIENT
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 
         documento = Document()
-        documento.add_heading("Relatório de Recebimentos", 0)
 
-        documento.add_paragraph(
-            f"Período: {nome_periodo} | Gerado em: {agora.strftime('%d/%m/%Y %H:%M')}"
+        # Página A4 em paisagem
+        section = documento.sections[0]
+        section.orientation = WD_ORIENT.LANDSCAPE
+        section.page_width = Inches(11.69)
+        section.page_height = Inches(8.27)
+        section.top_margin = Inches(0.35)
+        section.bottom_margin = Inches(0.35)
+        section.left_margin = Inches(0.35)
+        section.right_margin = Inches(0.35)
+
+        titulo = documento.add_heading("Relatório de Recebimentos", 0)
+        titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        info = documento.add_paragraph(
+            f"Período: {nome_periodo} | Gerado em: "
+            f"{agora.strftime('%d/%m/%Y %H:%M')}"
         )
+        info.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         tabela = documento.add_table(rows=1, cols=len(cabecalhos))
         tabela.style = "Table Grid"
+        tabela.alignment = WD_TABLE_ALIGNMENT.CENTER
+        tabela.autofit = False
 
-        for i, titulo in enumerate(cabecalhos):
-            tabela.rows[0].cells[i].text = titulo
+        # Larguras das 12 colunas em polegadas
+        larguras = [
+            0.38, 1.10, 0.82, 0.78,
+            0.55, 0.90, 1.35, 0.90,
+            0.58, 0.72, 0.90, 0.90
+        ]
 
+        # Cabeçalho
+        for i, titulo_coluna in enumerate(cabecalhos):
+            celula = tabela.rows[0].cells[i]
+            celula.text = titulo_coluna
+            celula.width = Inches(larguras[i])
+            celula.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+            for p_cell in celula.paragraphs:
+                p_cell.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for run in p_cell.runs:
+                    run.bold = True
+                    run.font.size = Pt(7)
+
+        # Dados
         for r in registros:
             valores = linha_registro(r)
             linha = tabela.add_row().cells
 
             for i, valor in enumerate(valores):
                 linha[i].text = str(valor)
+                linha[i].width = Inches(larguras[i])
+                linha[i].vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+                for p_cell in linha[i].paragraphs:
+                    p_cell.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    for run in p_cell.runs:
+                        run.font.size = Pt(7)
 
         arquivo = BytesIO()
         documento.save(arquivo)
