@@ -514,6 +514,7 @@ label {
 
 <div class="container">
 
+    {% if not filtro and not pesquisa %}
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:18px;">
         <div style="background:#111827;color:white;padding:16px;border-radius:12px;">
             <div style="font-size:13px;opacity:.8;">📦 Hoje <a href="/?filtro=hoje" style="float:right;color:white;font-weight:bold;">Ver</a></div>
@@ -552,6 +553,7 @@ label {
     </div>
     {% endif %}
 
+    {% if not filtro and not pesquisa %}
     <div class="card">
         <h2>Novo recebimento</h2>
 
@@ -669,7 +671,44 @@ label {
         </form>
     </div>
 
+    {% endif %}
+
+    {% endif %}
+
     <div class="card historico-card">
+
+        {% if filtro or pesquisa %}
+        <style>
+            .topo { display:none !important; }
+        </style>
+
+        <a href="/"
+           style="display:inline-block;
+           margin-bottom:16px;
+           padding:10px 14px;
+           background:#111827;
+           color:white;
+           border-radius:8px;
+           text-decoration:none;
+           font-weight:bold;">
+            ← Voltar
+        </a>
+
+        <div style="margin-bottom:16px;font-size:18px;font-weight:bold;">
+            {% if pesquisa %}
+                Resultados da busca: "{{ pesquisa }}"
+            {% elif filtro == "hoje" %}
+                Recebimentos de hoje
+            {% elif filtro == "semana" %}
+                Recebimentos desta semana
+            {% elif filtro == "pendentes" %}
+                Pendências
+            {% elif filtro == "conferidos" %}
+                Recebimentos conferidos
+            {% endif %}
+        </div>
+        {% endif %}
+
         <div class="historico-titulo">
             <h2>Histórico</h2>
             <span class="total-registros">
