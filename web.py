@@ -1402,9 +1402,6 @@ def gerar_relatorio():
     periodo = request.form.get("periodo", "tudo")
     formato = request.form.get("formato", "xlsx")
 
-    if formato != "xlsx":
-        return "Este formato será ativado no próximo passo.", 400
-
     agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
     banco = conectar()
 
@@ -1467,6 +1464,215 @@ def gerar_relatorio():
         nome_periodo = "completo"
 
     banco.close()
+
+    cabecalhos = [
+        "ID",
+        "Fornecedor",
+        "Nota Fiscal",
+        "Data da NF",
+        "Volumes",
+        "Recebido por",
+        "Observação",
+        "Data do recebimento",
+        "Hora",
+        "Status",
+        "Conferido por",
+        "Conferido em"
+    ]
+
+    def linha_registro(r):
+        return [
+            r["id"],
+            r["fornecedor"] or "",
+            r["nota_fiscal"] or "",
+            r["data_nf"] or "",
+            r["volumes"] or 0,
+            r["funcionario"] or "",
+            r["observacao"] or "",
+            r["data"] or "",
+            r["hora"] or "",
+            "Conferido" if r["conferido"] else "Pendente",
+            r["conferido_por"] or "",
+            r["conferido_em"] or ""
+        ]
+
+    if formato == "csv":
+        import csv
+        from io import StringIO
+
+        texto = StringIO()
+        writer = csv.writer(texto, delimiter=";")
+        writer.writerow(cabecalhos)
+
+        for r in registros:
+            writer.writerow(linha_registro(r))
+
+        arquivo = BytesIO()
+        arquivo.write(("\ufeff" + texto.getvalue()).encode("utf-8"))
+        arquivo.seek(0)
+
+        nome = f"recebimentos_{nome_periodo}_{agora.strftime('%d-%m-%Y')}.csv"
+
+        return send_file(
+            arquivo,
+            as_attachment=True,
+            download_name=nome,
+            mimetype="text/csv; charset=utf-8"
+        )
+
+    if formato == "pdf":
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet
+
+        arquivo = BytesIO()
+
+        doc = SimpleDocTemplate(
+            arquivo,
+            pagesize=landscape(A4),
+            rightMargin=20,
+            leftMargin=20,
+            topMargin=20,
+            bottomMargin=20
+        )
+
+        estilos = getSampleStyleSheet()
+        elementos = [
+            Paragraph("Relatório de Recebimentos", estilos["Title"]),
+            Spacer(1, 12)
+        ]
+
+        dados = [cabecalhos]
+
+        for r in registros:
+            dados.append([str(v) for v in linha_registro(r)])
+
+        tabela = Table(dados, repeatRows=1)
+
+        tabela.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#111827")),
+            ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0), (-1,-1), 7),
+            ("GRID", (0,0), (-1,-1), 0.25, colors.grey),
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#f3f4f6")])
+        ]))
+
+        elementos.append(tabela)
+        doc.build(elementos)
+
+        arquivo.seek(0)
+
+        nome = f"recebimentos_{nome_periodo}_{agora.strftime('%d-%m-%Y')}.pdf"
+
+        return send_file(
+            arquivo,
+            as_attachment=True,
+            download_name=nome,
+            mimetype="application/pdf"
+        )
+
+    if formato == "docx":
+        from docx import Document
+
+        documento = Document()
+        documento.add_heading("Relatório de Recebimentos", 0)
+
+        documento.add_paragraph(
+            f"Período: {nome_periodo} | Gerado em: {agora.strftime('%d/%m/%Y %H:%M')}"
+        )
+
+        tabela = documento.add_table(rows=1, cols=len(cabecalhos))
+        tabela.style = "Table Grid"
+
+        for i, titulo in enumerate(cabecalhos):
+            tabela.rows[0].cells[i].text = titulo
+
+        for r in registros:
+            valores = linha_registro(r)
+            linha = tabela.add_row().cells
+
+            for i, valor in enumerate(valores):
+                linha[i].text = str(valor)
+
+        arquivo = BytesIO()
+        documento.save(arquivo)
+        arquivo.seek(0)
+
+        nome = f"recebimentos_{nome_periodo}_{agora.strftime('%d-%m-%Y')}.docx"
+
+        return send_file(
+            arquivo,
+            as_attachment=True,
+            download_name=nome,
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+    if formato == "zip":
+        import zipfile
+        import csv
+        from io import StringIO
+        from openpyxl import Workbook
+
+        zip_buffer = BytesIO()
+
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as z:
+
+            # CSV
+            texto = StringIO()
+            writer = csv.writer(texto, delimiter=";")
+            writer.writerow(cabecalhos)
+
+            for r in registros:
+                writer.writerow(linha_registro(r))
+
+            z.writestr(
+                f"recebimentos_{nome_periodo}.csv",
+                "\ufeff" + texto.getvalue()
+            )
+
+            # Excel
+            wb_zip = Workbook()
+            ws_zip = wb_zip.active
+            ws_zip.title = "Recebimentos"
+            ws_zip.append(cabecalhos)
+
+            for r in registros:
+                ws_zip.append(linha_registro(r))
+
+            excel_buffer = BytesIO()
+            wb_zip.save(excel_buffer)
+
+            z.writestr(
+                f"recebimentos_{nome_periodo}.xlsx",
+                excel_buffer.getvalue()
+            )
+
+            # Texto-resumo
+            resumo = (
+                f"Backup de Recebimentos\n"
+                f"Período: {nome_periodo}\n"
+                f"Gerado em: {agora.strftime('%d/%m/%Y %H:%M:%S')}\n"
+                f"Total de registros: {len(registros)}\n"
+            )
+
+            z.writestr("LEIA-ME.txt", resumo)
+
+        zip_buffer.seek(0)
+
+        nome = f"backup_recebimentos_{nome_periodo}_{agora.strftime('%d-%m-%Y')}.zip"
+
+        return send_file(
+            zip_buffer,
+            as_attachment=True,
+            download_name=nome,
+            mimetype="application/zip"
+        )
+
+    if formato not in ("xlsx",):
+        return "Formato inválido.", 400
 
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment
