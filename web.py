@@ -1464,10 +1464,22 @@ def assistente():
             params = tuple(params) + (funcionario_detectado,)
 
             banco = conectar()
+
             total = banco.execute(
                 "SELECT COUNT(*) AS total FROM recebimentos" + where,
                 params
             ).fetchone()["total"]
+
+            resultados_func = []
+
+            if any(x in texto for x in [
+                "quais", "mostrar", "mostre", "lista", "listar"
+            ]):
+                resultados_func = banco.execute(
+                    "SELECT * FROM recebimentos" + where + " ORDER BY id DESC",
+                    params
+                ).fetchall()
+
             banco.close()
 
             nomes = {
@@ -1486,11 +1498,10 @@ def assistente():
                 ASSISTENTE_HTML,
                 pergunta=pergunta,
                 mensagem=mensagem,
-                resultados=[],
+                resultados=resultados_func,
                 arquivo_formato=None,
                 arquivo_periodo=None
             )
-
 
         if "hoje" in texto and (
             any(x in texto for x in ["quantos", "quantas", "quanto", "quantidade"])
