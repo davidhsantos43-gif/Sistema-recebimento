@@ -728,6 +728,7 @@ label {
             <button class="botao" type="submit">
                 REGISTRAR RECEBIMENTO
             </button>
+        <div id="avisoOffline" style="display:none;margin-top:14px;padding:12px;border-radius:10px;background:#fff3cd;font-weight:bold;text-align:center;"></div>
         </form>
     </div>
 
@@ -911,12 +912,14 @@ if (formRecebimento) {
         });
 
             localStorage.setItem("recebimentos_offline", JSON.stringify(fila));
+                atualizarAvisoOffline();
 
             alert("📴 Sem internet. Recebimento salvo no aparelho e será enviado quando a conexão voltar.");
             formRecebimento.reset();
         }
     });
 }
+function atualizarAvisoOffline() { const fila = JSON.parse(localStorage.getItem("recebimentos_offline") || "[]"); const aviso = document.getElementById("avisoOffline"); if (!aviso) return; if (fila.length > 0) { aviso.style.display = "block"; aviso.textContent = "📴 " + fila.length + " recebimento(s) aguardando sincronização."; } else { aviso.style.display = "none"; } }
 async function sincronizarOffline() {
     if (!navigator.onLine) return;
     const fila = JSON.parse(localStorage.getItem("recebimentos_offline") || "[]");
@@ -927,9 +930,11 @@ async function sincronizarOffline() {
         const resposta = await fetch("/registrar", {method: "POST", body: dados});
         if (!resposta.ok) restantes.push(item);
     }
+        atualizarAvisoOffline();
     localStorage.setItem("recebimentos_offline", JSON.stringify(restantes));
 }
 window.addEventListener("online", sincronizarOffline);
+atualizarAvisoOffline();
 sincronizarOffline();
 </script>
 
