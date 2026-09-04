@@ -108,15 +108,6 @@ def registrar_log(usuario, acao, entidade=None, entidade_id=None, detalhes=None)
 def criar_banco():
     banco = conectar()
 
-    if offline_id:
-        existente = banco.execute(
-            "SELECT id FROM recebimentos WHERE offline_id = ?",
-            (offline_id,)
-        ).fetchone()
-
-        if existente:
-            banco.close()
-            return ("OK", 200)
 
     banco.execute("""
         CREATE TABLE IF NOT EXISTS recebimentos (
