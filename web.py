@@ -1417,6 +1417,15 @@ def assistente():
         elif "tudo" in texto or "completo" in texto:
             arquivo_periodo = "tudo"
 
+        if ("backup" in texto or "zip" in texto) and not arquivo_periodo:
+            arquivo_periodo = "tudo"
+
+        if "relatorio" in texto and not arquivo_formato:
+            arquivo_formato = "pdf"
+
+        if arquivo_formato and not arquivo_periodo:
+            arquivo_periodo = "tudo"
+
         if arquivo_formato and arquivo_periodo:
             mensagem = "Arquivo pronto para gerar."
             return render_template_string(
@@ -2088,6 +2097,111 @@ def assistente():
                 ASSISTENTE_HTML, pergunta=pergunta,
                 mensagem=mensagem, resultados=[],
                 arquivo_formato=None, arquivo_periodo=None
+            )
+
+        if "volume" in texto and not periodo_detectado:
+            hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")
+            banco = conectar()
+            total = banco.execute(
+                "SELECT COALESCE(SUM(volumes),0) AS total FROM recebimentos WHERE data = ?",
+                (hoje,)
+            ).fetchone()["total"]
+            banco.close()
+
+            mensagem = f"Hoje chegaram {total} volume(s)."
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+        if any(x in texto for x in [
+            "lista", "listar", "mostrar", "mostre",
+            "quais", "recebimentos", "notas", "nota fiscal"
+        ]):
+            periodo_lista = periodo_detectado or "hoje"
+            where, params = filtro_periodo(periodo_lista)
+
+            banco = conectar()
+            resultados = banco.execute(
+                "SELECT * FROM recebimentos" + where + " ORDER BY id DESC",
+                params
+            ).fetchall()
+            banco.close()
+
+            nomes = {
+                "hoje": "hoje",
+                "ontem": "ontem",
+                "semana": "nesta semana",
+                "mes": "neste mês"
+            }
+
+            mensagem = f"Encontrei {len(resultados)} recebimento(s) {nomes[periodo_lista]}."
+
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=resultados,
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+        banco = conectar()
+        funcionarios = banco.execute(
+            "SELECT DISTINCT funcionario FROM recebimentos WHERE funcionario IS NOT NULL AND funcionario <> ''"
+        ).fetchall()
+        banco.close()
+
+        funcionario_detectado = None
+        for r in funcionarios:
+            nome = r["funcionario"]
+            if nome and normalizar_texto(nome) in texto:
+                funcionario_detectado = nome
+                break
+
+        if funcionario_detectado and any(x in texto for x in [
+            "quantos", "quantas", "quanto", "quantidade", "recebimento"
+        ]):
+            periodo_func = periodo_detectado or "hoje"
+            where, params = filtro_periodo(periodo_func)
+
+            if where:
+                where += " AND funcionario = ?"
+            else:
+                where = " WHERE funcionario = ?"
+
+            params = tuple(params) + (funcionario_detectado,)
+
+            banco = conectar()
+            total = banco.execute(
+                "SELECT COUNT(*) AS total FROM recebimentos" + where,
+                params
+            ).fetchone()["total"]
+            banco.close()
+
+            nomes = {
+                "hoje": "hoje",
+                "ontem": "ontem",
+                "semana": "nesta semana",
+                "mes": "neste mês"
+            }
+
+            mensagem = (
+                f"{funcionario_detectado} recebeu {total} entrega(s) "
+                f"{nomes[periodo_func]}."
+            )
+
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=None,
+                arquivo_periodo=None
             )
 
         numeros = []
