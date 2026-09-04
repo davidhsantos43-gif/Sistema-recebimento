@@ -1437,6 +1437,61 @@ def assistente():
                 arquivo_periodo=arquivo_periodo
             )
 
+        banco = conectar()
+        funcionarios = banco.execute(
+            "SELECT DISTINCT funcionario FROM recebimentos WHERE funcionario IS NOT NULL AND funcionario <> ''"
+        ).fetchall()
+        banco.close()
+
+        funcionario_detectado = None
+        for r in funcionarios:
+            nome = r["funcionario"]
+            if nome and normalizar_texto(nome) in texto:
+                funcionario_detectado = nome
+                break
+
+        if funcionario_detectado and any(x in texto for x in [
+            "quantos", "quantas", "quanto", "quantidade", "recebimento"
+        ]):
+            periodo_func = periodo_detectado or "hoje"
+            where, params = filtro_periodo(periodo_func)
+
+            if where:
+                where += " AND funcionario = ?"
+            else:
+                where = " WHERE funcionario = ?"
+
+            params = tuple(params) + (funcionario_detectado,)
+
+            banco = conectar()
+            total = banco.execute(
+                "SELECT COUNT(*) AS total FROM recebimentos" + where,
+                params
+            ).fetchone()["total"]
+            banco.close()
+
+            nomes = {
+                "hoje": "hoje",
+                "ontem": "ontem",
+                "semana": "nesta semana",
+                "mes": "neste mês"
+            }
+
+            mensagem = (
+                f"{funcionario_detectado} recebeu {total} entrega(s) "
+                f"{nomes[periodo_func]}."
+            )
+
+            return render_template_string(
+                ASSISTENTE_HTML,
+                pergunta=pergunta,
+                mensagem=mensagem,
+                resultados=[],
+                arquivo_formato=None,
+                arquivo_periodo=None
+            )
+
+
         if "hoje" in texto and (
             any(x in texto for x in ["quantos", "quantas", "quanto", "quantidade"])
             and any(x in texto for x in ["recebimento", "entrega", "mercadoria"])
@@ -2146,60 +2201,6 @@ def assistente():
                 pergunta=pergunta,
                 mensagem=mensagem,
                 resultados=resultados,
-                arquivo_formato=None,
-                arquivo_periodo=None
-            )
-
-        banco = conectar()
-        funcionarios = banco.execute(
-            "SELECT DISTINCT funcionario FROM recebimentos WHERE funcionario IS NOT NULL AND funcionario <> ''"
-        ).fetchall()
-        banco.close()
-
-        funcionario_detectado = None
-        for r in funcionarios:
-            nome = r["funcionario"]
-            if nome and normalizar_texto(nome) in texto:
-                funcionario_detectado = nome
-                break
-
-        if funcionario_detectado and any(x in texto for x in [
-            "quantos", "quantas", "quanto", "quantidade", "recebimento"
-        ]):
-            periodo_func = periodo_detectado or "hoje"
-            where, params = filtro_periodo(periodo_func)
-
-            if where:
-                where += " AND funcionario = ?"
-            else:
-                where = " WHERE funcionario = ?"
-
-            params = tuple(params) + (funcionario_detectado,)
-
-            banco = conectar()
-            total = banco.execute(
-                "SELECT COUNT(*) AS total FROM recebimentos" + where,
-                params
-            ).fetchone()["total"]
-            banco.close()
-
-            nomes = {
-                "hoje": "hoje",
-                "ontem": "ontem",
-                "semana": "nesta semana",
-                "mes": "neste mês"
-            }
-
-            mensagem = (
-                f"{funcionario_detectado} recebeu {total} entrega(s) "
-                f"{nomes[periodo_func]}."
-            )
-
-            return render_template_string(
-                ASSISTENTE_HTML,
-                pergunta=pergunta,
-                mensagem=mensagem,
-                resultados=[],
                 arquivo_formato=None,
                 arquivo_periodo=None
             )
