@@ -108,6 +108,16 @@ def registrar_log(usuario, acao, entidade=None, entidade_id=None, detalhes=None)
 def criar_banco():
     banco = conectar()
 
+    if offline_id:
+        existente = banco.execute(
+            "SELECT id FROM recebimentos WHERE offline_id = ?",
+            (offline_id,)
+        ).fetchone()
+
+        if existente:
+            banco.close()
+            return ("OK", 200)
+
     banco.execute("""
         CREATE TABLE IF NOT EXISTS recebimentos (
             id SERIAL PRIMARY KEY,
@@ -128,6 +138,8 @@ def criar_banco():
     banco.execute("ALTER TABLE recebimentos ADD COLUMN IF NOT EXISTS conferido INTEGER NOT NULL DEFAULT 0")
     banco.execute("ALTER TABLE recebimentos ADD COLUMN IF NOT EXISTS conferido_por TEXT")
     banco.execute("ALTER TABLE recebimentos ADD COLUMN IF NOT EXISTS conferido_em TEXT")
+    banco.execute("ALTER TABLE recebimentos ADD COLUMN IF NOT EXISTS offline_id TEXT")
+    banco.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_recebimentos_offline_id ON recebimentos (offline_id) WHERE offline_id IS NOT NULL")
     banco.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id SERIAL PRIMARY KEY,
@@ -238,6 +250,13 @@ HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Controle de Recebimentos</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#111827">
+<script>
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/static/service-worker.js");
+}
+</script>
 
 <style>
 * {
@@ -623,7 +642,7 @@ label {
     <div class="card">
         <h2>Novo recebimento</h2>
 
-        <form method="POST" action="/registrar">
+        <form id="form-recebimento" method="POST" action="/registrar">
 
             <label>Fornecedor</label>
             <input
@@ -882,6 +901,46 @@ label {
         SAIR
     </a>
 </div>
+
+<script>
+const formRecebimento = document.getElementById("form-recebimento");
+
+if (formRecebimento) {
+    formRecebimento.addEventListener("submit", function(e) {
+        if (!navigator.onLine) {
+            e.preventDefault();
+
+            const dados = Object.fromEntries(new FormData(formRecebimento).entries());
+            const fila = JSON.parse(localStorage.getItem("recebimentos_offline") || "[]");
+
+            fila.push({
+            ...dados,
+                salvo_em: new Date().toISOString(),
+            offline_id: (crypto.randomUUID ? crypto.randomUUID() : "off-" + Date.now()),
+        });
+
+            localStorage.setItem("recebimentos_offline", JSON.stringify(fila));
+
+            alert("📴 Sem internet. Recebimento salvo no aparelho e será enviado quando a conexão voltar.");
+            formRecebimento.reset();
+        }
+    });
+}
+async function sincronizarOffline() {
+    if (!navigator.onLine) return;
+    const fila = JSON.parse(localStorage.getItem("recebimentos_offline") || "[]");
+    if (fila.length === 0) return;
+    const restantes = [];
+    for (const item of fila) {
+        const dados = new URLSearchParams(item);
+        const resposta = await fetch("/registrar", {method: "POST", body: dados});
+        if (!resposta.ok) restantes.push(item);
+    }
+    localStorage.setItem("recebimentos_offline", JSON.stringify(restantes));
+}
+window.addEventListener("online", sincronizarOffline);
+sincronizarOffline();
+</script>
 
 </body>
 </html>
@@ -3386,6 +3445,7 @@ def registrar():
     fornecedor = request.form["fornecedor"].strip()
     nota_fiscal = request.form["nota_fiscal"].strip()
     data_nf = request.form.get("data_nf", "").strip()
+    offline_id = request.form.get("offline_id", "").strip() or None
     funcionario = session.get("usuario", "")
     observacao = request.form["observacao"].strip()
 
@@ -3413,9 +3473,10 @@ def registrar():
             funcionario,
             observacao,
             data,
-            hora
+            hora,
+            offline_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         fornecedor,
         nota_fiscal,
@@ -3424,7 +3485,8 @@ def registrar():
         funcionario,
         observacao,
         data,
-        hora
+        hora,
+            offline_id
     ))
 
     banco.commit()
@@ -3824,3 +3886,7 @@ def configurar_acesso_logs(id_usuario, valor):
     banco.close()
 
     return redirect(url_for("configuracoes"))
+
+@app.route("/static/service-worker.js")
+def service_worker():
+    return app.send_static_file("service-worker.js")
