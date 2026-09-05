@@ -359,6 +359,12 @@ label {
     margin: 0;
 }
 
+
+.historico-cabecalho-acoes { display:flex; align-items:center; gap:10px; }
+.form-limpar-historico { margin:0; }
+.botao-limpar-historico { padding:7px 11px; border:1px solid #fecaca; border-radius:7px; background:white; color:#b91c1c; font-size:12px; font-weight:bold; cursor:pointer; }
+.botao-limpar-historico:hover { background:#fef2f2; }
+
 .total-registros {
     padding: 6px 10px;
     border-radius: 999px;
@@ -788,9 +794,16 @@ label {
 
         <div class="historico-titulo">
             <h2>Histórico</h2>
-            <span class="total-registros">
+            <div class="historico-cabecalho-acoes">
+                <span class="total-registros">
                 {{ registros|length }} registro{% if registros|length != 1 %}s{% endif %}
             </span>
+                {% if session.get("nivel") == "admin" and registros %}
+                <form class="form-limpar-historico" method="POST" action="/limpar-historico" onsubmit="return confirm('ATENÇÃO: todos os recebimentos do histórico serão apagados permanentemente. Deseja continuar?');">
+                    <button class="botao-limpar-historico" type="submit">Limpar histórico</button>
+                </form>
+                {% endif %}
+            </div>
         </div>
 
         {% if registros %}
@@ -3491,6 +3504,17 @@ def registrar():
     return redirect("/")
 
 
+
+
+@app.route("/limpar-historico", methods=["POST"])
+def limpar_historico():
+    if session.get("nivel") != "admin":
+        return redirect(url_for("inicio"))
+    banco = conectar()
+    banco.execute("DELETE FROM recebimentos")
+    banco.commit()
+    banco.close()
+    return redirect(url_for("inicio"))
 
 
 EDITAR_HTML = """
