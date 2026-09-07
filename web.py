@@ -794,16 +794,9 @@ label {
 
         <div class="historico-titulo">
             <h2>Histórico</h2>
-            <div class="historico-cabecalho-acoes">
-                <span class="total-registros">
+            <span class="total-registros">
                 {{ registros|length }} registro{% if registros|length != 1 %}s{% endif %}
             </span>
-                {% if session.get("nivel") == "admin" and registros %}
-                <form class="form-limpar-historico" method="POST" action="/limpar-historico" onsubmit="return confirm('ATENÇÃO: todos os recebimentos do histórico serão apagados permanentemente. Deseja continuar?');">
-                    <button class="botao-limpar-historico" type="submit">Limpar histórico</button>
-                </form>
-                {% endif %}
-            </div>
         </div>
 
         {% if registros %}
@@ -1195,6 +1188,10 @@ tr:hover {
 <p class="vazio">Nenhum log registrado ainda.</p>
 {% endif %}
 
+<form method="POST" action="/logs/limpar" onsubmit="return confirm('ATENÇÃO: todos os logs serão apagados permanentemente. Deseja continuar?');" style="margin:22px 0 12px;">
+<button type="submit" style="padding:11px 16px;border:1px solid #fecaca;border-radius:8px;background:#fff;color:#b91c1c;font-weight:bold;cursor:pointer;">LIMPAR LOGS</button>
+</form>
+
 <a class="voltar" href="/">Voltar ao sistema</a>
 </div>
 </div>
@@ -1221,6 +1218,17 @@ def logs_sistema():
 
     return render_template_string(LOGS_HTML, logs=logs)
 
+
+
+@app.route("/logs/limpar", methods=["POST"])
+def limpar_logs():
+    if session.get("nivel") != "admin":
+        return redirect(url_for("inicio"))
+    banco = conectar()
+    banco.execute("DELETE FROM logs")
+    banco.commit()
+    banco.close()
+    return redirect(url_for("logs_sistema"))
 
 
 CONFIGURACOES_HTML = """
@@ -3504,17 +3512,6 @@ def registrar():
     return redirect("/")
 
 
-
-
-@app.route("/limpar-historico", methods=["POST"])
-def limpar_historico():
-    if session.get("nivel") != "admin":
-        return redirect(url_for("inicio"))
-    banco = conectar()
-    banco.execute("DELETE FROM recebimentos")
-    banco.commit()
-    banco.close()
-    return redirect(url_for("inicio"))
 
 
 EDITAR_HTML = """
