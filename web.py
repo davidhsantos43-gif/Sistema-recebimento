@@ -553,6 +553,7 @@ label {
 </a>
 {% endif %}
 
+{% if pode_ver_logs() %}
 <a href="/logs"
    style="display:flex;align-items:center;justify-content:center;
    width:100%;min-height:54px;
@@ -564,6 +565,7 @@ label {
    box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
     LOGS DO SISTEMA
 </a>
+{% endif %}
 
 <a href="/observacoes"
    style="display:flex;align-items:center;justify-content:center;
@@ -1200,9 +1202,29 @@ tr:hover {
 """
 
 
+def usuario_pode_ver_logs():
+    usuario = session.get("usuario")
+    if not usuario:
+        return False
+
+    banco = conectar()
+    registro = banco.execute(
+        "SELECT pode_ver_logs FROM usuarios WHERE usuario = ?",
+        (usuario,)
+    ).fetchone()
+    banco.close()
+
+    return bool(registro and registro["pode_ver_logs"])
+
+
+@app.context_processor
+def permissoes_template():
+    return {"pode_ver_logs": usuario_pode_ver_logs}
+
+
 @app.route("/logs")
 def logs_sistema():
-    if session.get("nivel") != "admin":
+    if not usuario_pode_ver_logs():
         return redirect(url_for("inicio"))
 
     banco = conectar()
@@ -1222,7 +1244,7 @@ def logs_sistema():
 
 @app.route("/logs/limpar", methods=["POST"])
 def limpar_logs():
-    if session.get("nivel") != "admin":
+    if not usuario_pode_ver_logs():
         return redirect(url_for("inicio"))
     banco = conectar()
     banco.execute("DELETE FROM logs")
@@ -1270,7 +1292,9 @@ body {
 
 <a class="opcao" href="/usuarios">Gerenciar usuários</a>
 <a class="opcao" href="/observacoes">Gerenciar observações</a>
+{% if pode_ver_logs() %}
 <a class="opcao" href="/logs">Logs do sistema</a>
+{% endif %}
 <a class="opcao" href="/relatorios">📦 Relatórios e Backups</a>
 
 <h2>Acesso aos logs</h2>
@@ -2439,7 +2463,7 @@ Os arquivos serão gerados diretamente a partir dos dados salvos no banco.
 
 @app.route("/relatorios")
 def relatorios():
-    if session.get("usuario") != "ADMIN":
+    if session.get("usuario") not in ("ADMIN", "GELOMAQ"):
         return redirect(url_for("inicio"))
 
     return render_template_string(RELATORIOS_HTML)
@@ -2448,7 +2472,7 @@ def relatorios():
 
 @app.route("/relatorios/gerar", methods=["GET","POST"])
 def gerar_relatorio():
-    if session.get("usuario") != "ADMIN":
+    if session.get("usuario") not in ("ADMIN", "GELOMAQ"):
         return redirect(url_for("inicio"))
 
     periodo = request.values.get("periodo", "tudo")
