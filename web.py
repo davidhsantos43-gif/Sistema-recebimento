@@ -268,9 +268,10 @@ body {
 }
 
 .container {
-    max-width: 900px;
+    width: calc(100% - 32px);
+    max-width: 1600px;
     margin: auto;
-    padding: 20px;
+    padding: 16px;
 }
 
 .card {
