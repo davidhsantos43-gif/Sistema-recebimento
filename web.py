@@ -958,6 +958,36 @@ async function sincronizarOffline() {
 window.addEventListener("online", sincronizarOffline);
 atualizarAvisoOffline();
 sincronizarOffline();
+
+// Mantém a posição da tela ao marcar como conferido
+document.querySelectorAll('form[action^="/conferir/"]').forEach(function(form) {
+    form.addEventListener("submit", function() {
+        const grade = document.querySelector(".historico-grade");
+
+        sessionStorage.setItem("historico_scroll_y", window.scrollY);
+
+        if (grade) {
+            sessionStorage.setItem("historico_scroll_x", grade.scrollLeft);
+        }
+    });
+});
+
+window.addEventListener("load", function() {
+    const y = sessionStorage.getItem("historico_scroll_y");
+    const x = sessionStorage.getItem("historico_scroll_x");
+    const grade = document.querySelector(".historico-grade");
+
+    if (y !== null) {
+        window.scrollTo(0, parseInt(y));
+    }
+
+    if (grade && x !== null) {
+        grade.scrollLeft = parseInt(x);
+    }
+
+    sessionStorage.removeItem("historico_scroll_y");
+    sessionStorage.removeItem("historico_scroll_x");
+});
 </script>
 
 </body>
