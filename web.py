@@ -388,12 +388,12 @@ label {
 
 .historico-tabela th,
 .historico-tabela td {
-    padding: 13px 12px;
+    padding: 8px 7px;
     border-right: 1px solid #e5e7eb;
     border-bottom: 1px solid #e5e7eb;
     text-align: left;
     vertical-align: top;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .historico-tabela th:last-child,
@@ -419,13 +419,13 @@ label {
 }
 
 .historico-tabela .col-fornecedor {
-    min-width: 150px;
+    min-width: 110px;
     font-weight: bold;
 }
 
 .historico-tabela .col-observacao {
-    min-width: 210px;
-    max-width: 280px;
+    min-width: 130px;
+    max-width: 170px;
     white-space: normal;
 }
 
