@@ -1,0 +1,19 @@
+name: Migrar banco
+on: workflow_dispatch
+jobs:
+  migrar:
+    runs-on: ubuntu-latest
+    container: postgres:18
+    timeout-minutes: 20
+    steps:
+      - name: Copiar Render para Supabase
+        env:
+          A: ${{ secrets.RENDER_DATABASE_URL }}
+          B: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          set -eu
+          pg_dump "$A" -Fc -O -x -f /tmp/banco.dump
+          pg_restore -l /tmp/banco.dump | sed '/ SCHEMA - public /s/^/;/' > /tmp/lista
+          pg_restore -d "$B" -L /tmp/lista -O -x --exit-on-error /tmp/banco.dump
+          psql "$B" -c "\dt"
+          echo MIGRACAO_CONCLUIDA
