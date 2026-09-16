@@ -1,5 +1,6 @@
 name: Migrar banco
-on: workflow_dispatch
+on:
+  workflow_dispatch:
 jobs:
   migrar:
     runs-on: ubuntu-latest
