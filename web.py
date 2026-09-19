@@ -3834,28 +3834,17 @@ def editar_recebimento(id):
             SET fornecedor = ?,
 
                 nota_fiscal = ?,
-
+                data_nf = ?,
                 volumes = ?,
 
-                observacao = ?
+                observacao = ?,
+                funcionario = ?
 
             WHERE id = ?
 
             """,
 
-            (
-
-                fornecedor,
-
-                nota_fiscal,
-
-                volumes,
-
-                observacao,
-
-                id
-
-            )
+            (fornecedor, nota_fiscal, data_nf, volumes, observacao, funcionario, id)
 
         )
 
