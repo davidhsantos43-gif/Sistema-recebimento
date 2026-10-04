@@ -83,6 +83,46 @@ def conectar():
     return Banco()
 
 
+def obter_config(chave, padrao=""):
+    banco = None
+    try:
+        banco = conectar()
+        resultado = banco.execute(
+            "SELECT valor FROM configuracoes_sistema WHERE chave = ?",
+            (chave,)
+        ).fetchone()
+
+        if resultado:
+            return resultado["valor"]
+
+        return padrao
+    except Exception:
+        return padrao
+    finally:
+        if banco:
+            banco.close()
+
+
+def salvar_config(chave, valor):
+    banco = conectar()
+    banco.execute(
+        """
+        INSERT INTO configuracoes_sistema (chave, valor)
+        VALUES (?, ?)
+        ON CONFLICT (chave)
+        DO UPDATE SET valor = EXCLUDED.valor
+        """,
+        (chave, str(valor))
+    )
+    banco.commit()
+    banco.close()
+
+
+def config_ativa(chave, padrao=True):
+    valor_padrao = "1" if padrao else "0"
+    return obter_config(chave, valor_padrao) == "1"
+
+
 def registrar_log(usuario, acao, entidade=None, entidade_id=None, detalhes=None):
     try:
         banco = conectar()
@@ -228,6 +268,34 @@ def criar_banco():
                     "admin"
                 )
             )
+
+    banco.execute("""
+        CREATE TABLE IF NOT EXISTS configuracoes_sistema (
+            chave TEXT PRIMARY KEY,
+            valor TEXT
+        )
+    """)
+
+    configuracoes_padrao = {
+        "nome_sistema": "Controle de Recebimentos",
+        "subtitulo_sistema": "Registro e acompanhamento de entregas",
+        "empresa": "GELOMAQ",
+        "mensagem_confirmacao": "Confira atentamente antes de confirmar.",
+        "mostrar_dashboard": "1",
+        "mostrar_ranking": "1",
+        "mostrar_assistente": "1",
+        "confirmar_recebimento": "1"
+    }
+
+    for chave, valor in configuracoes_padrao.items():
+        banco.execute(
+            """
+            INSERT INTO configuracoes_sistema (chave, valor)
+            VALUES (?, ?)
+            ON CONFLICT (chave) DO NOTHING
+            """,
+            (chave, valor)
+        )
 
     banco.commit()
     banco.close()
@@ -1380,69 +1448,80 @@ CONFIGURACOES_HTML = """
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Configurações</title>
 <style>
-body {
-    font-family: Arial, sans-serif;
-    background:#f3f4f6;
-    margin:0;
-    padding:20px;
-}
-.caixa {
-    max-width:700px;
-    margin:30px auto;
-    background:white;
-    padding:25px;
-    border-radius:12px;
-}
-.opcao {
-    display:block;
-    padding:16px;
-    margin:12px 0;
-    background:#111827;
-    color:white;
-    text-decoration:none;
-    border-radius:9px;
-    font-weight:bold;
-}
-</style>
-</head>
-<body>
-<div class="caixa">
-<h1>⚙️ Configurações</h1>
-
-<a class="opcao" href="/usuarios">Gerenciar usuários</a>
-<a class="opcao" href="/observacoes">Gerenciar observações</a>
+*{box-sizing:border-box}
+body{font-family:Arial;background:#f3f4f6;padding:18px;color:#111827}
+.caixa{max-width:900px;margin:auto}
+.card{background:white;padding:20px;border-radius:14px;margin-bottom:16px}
+input[type=text]{width:100%;padding:12px;margin:6px 0 12px;border:1px solid #ccc;border-radius:8px}
+.check{display:block;margin:14px 0;font-weight:bold}
+.salvar,.opcao{display:block;width:100%;padding:14px;border:0;border-radius:9px;background:#111827;color:white;text-decoration:none;margin:9px 0;text-align:center;font-weight:bold}
+.salvar{background:#16a34a}
+.msg{background:#dcfce7;padding:12px;border-radius:9px}
+</style></head><body><div class="caixa">
+<h1>⚙️ Central de Configurações</h1>
+{% if mensagem %}<div class="msg">✅ {{ mensagem }}</div>{% endif %}
+<form method="POST">
+<div class="card">
+<h2>🏢 Geral</h2>
+<label>Nome do sistema</label>
+<input type="text" name="nome_sistema" value="{{ configs.nome_sistema }}">
+<label>Subtítulo</label>
+<input type="text" name="subtitulo_sistema" value="{{ configs.subtitulo_sistema }}">
+<label>Empresa</label>
+<input type="text" name="empresa" value="{{ configs.empresa }}">
+</div>
+<div class="card">
+<h2>📥 Recebimentos</h2>
+<label class="check">
+<input type="checkbox" name="confirmar_recebimento" value="1"
+{% if configs.confirmar_recebimento %}checked{% endif %}>
+Pedir confirmação antes de registrar
+</label>
+<label>Mensagem de confirmação</label>
+<input type="text" name="mensagem_confirmacao" value="{{ configs.mensagem_confirmacao }}">
+</div>
+<div class="card">
+<h2>📊 Dashboard</h2>
+<label class="check">
+<input type="checkbox" name="mostrar_dashboard" value="1"
+{% if configs.mostrar_dashboard %}checked{% endif %}> Mostrar dashboard
+</label>
+<label class="check">
+<input type="checkbox" name="mostrar_ranking" value="1"
+{% if configs.mostrar_ranking %}checked{% endif %}> Mostrar ranking
+</label>
+</div>
+<div class="card">
+<h2>🤖 Assistente</h2>
+<label class="check">
+<input type="checkbox" name="mostrar_assistente" value="1"
+{% if configs.mostrar_assistente %}checked{% endif %}> Mostrar assistente
+</label>
+</div>
+<button class="salvar" type="submit">💾 SALVAR CONFIGURAÇÕES</button>
+</form>
+<div class="card">
+<h2>🛠️ Administração</h2>
+<a class="opcao" href="/usuarios">👥 Gerenciar usuários</a>
+<a class="opcao" href="/observacoes">📝 Gerenciar observações</a>
 {% if pode_ver_logs() %}
-<a class="opcao" href="/logs">Logs do sistema</a>
+<a class="opcao" href="/logs">📋 Logs do sistema</a>
 {% endif %}
 <a class="opcao" href="/relatorios">📦 Relatórios e Backups</a>
-
-<h2>Acesso aos logs</h2>
-
-{% for a in admins %}
-<div style="padding:12px 0;border-bottom:1px solid #ddd;">
-    <strong>{{ a["usuario"] }}</strong>
-
-    {% if a["pode_ver_logs"] %}
-        <span> — ✅ Permitido</span>
-        {% if a["usuario"] != "ADMIN" %}
-        <form method="POST" action="/configuracoes/logs/{{ a['id'] }}/0" style="display:inline;">
-            <button type="submit">Bloquear</button>
-        </form>
-        {% endif %}
-    {% else %}
-        <span> — ❌ Bloqueado</span>
-        <form method="POST" action="/configuracoes/logs/{{ a['id'] }}/1" style="display:inline;">
-            <button type="submit">Permitir</button>
-        </form>
-    {% endif %}
 </div>
+<div class="card">
+<h2>🔐 Acesso aos logs</h2>
+{% for a in admins %}
+<p><strong>{{ a["usuario"] }}</strong>
+{% if a["pode_ver_logs"] %} — ✅ Permitido
+{% else %} — ❌ Bloqueado
+{% endif %}</p>
 {% endfor %}
-
-
-<a href="/">Voltar ao sistema</a>
+</div>
+<a class="opcao" href="/">← Voltar ao sistema</a>
 </div>
 </body>
 </html>
@@ -2983,10 +3062,45 @@ def gerar_relatorio():
     )
 
 
-@app.route("/configuracoes")
+@app.route("/configuracoes", methods=["GET", "POST"])
 def configuracoes():
     if session.get("usuario") != "ADMIN":
         return redirect(url_for("inicio"))
+
+    mensagem = None
+
+    if request.method == "POST":
+        campos_texto = [
+            "nome_sistema",
+            "subtitulo_sistema",
+            "empresa",
+            "mensagem_confirmacao"
+        ]
+
+        for chave in campos_texto:
+            salvar_config(chave, request.form.get(chave, "").strip())
+
+        campos_booleanos = [
+            "mostrar_dashboard",
+            "mostrar_ranking",
+            "mostrar_assistente",
+            "confirmar_recebimento"
+        ]
+
+        for chave in campos_booleanos:
+            salvar_config(
+                chave,
+                "1" if request.form.get(chave) == "1" else "0"
+            )
+
+        registrar_log(
+            session.get("usuario"),
+            "ALTEROU CONFIGURACOES",
+            "configuracoes",
+            detalhes="Configurações gerais do sistema atualizadas"
+        )
+
+        mensagem = "Configurações salvas com sucesso."
 
     banco = conectar()
     admins = banco.execute(
@@ -2999,11 +3113,32 @@ def configuracoes():
     ).fetchall()
     banco.close()
 
+    configs = {
+        "nome_sistema": obter_config(
+            "nome_sistema",
+            "Controle de Recebimentos"
+        ),
+        "subtitulo_sistema": obter_config(
+            "subtitulo_sistema",
+            "Registro e acompanhamento de entregas"
+        ),
+        "empresa": obter_config("empresa", "GELOMAQ"),
+        "mensagem_confirmacao": obter_config(
+            "mensagem_confirmacao",
+            "Confira atentamente antes de confirmar."
+        ),
+        "mostrar_dashboard": config_ativa("mostrar_dashboard"),
+        "mostrar_ranking": config_ativa("mostrar_ranking"),
+        "mostrar_assistente": config_ativa("mostrar_assistente"),
+        "confirmar_recebimento": config_ativa("confirmar_recebimento")
+    }
+
     return render_template_string(
         CONFIGURACOES_HTML,
-        admins=admins
+        admins=admins,
+        configs=configs,
+        mensagem=mensagem
     )
-
 
 USUARIOS_HTML = """
 <!DOCTYPE html>
