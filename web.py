@@ -700,7 +700,7 @@ label {
 
             <label>Observação</label>
             <textarea
-                name="observacao"
+                name="observacao" required
                 placeholder="Avarias, falta de volumes ou observações..."
             ></textarea>
 
@@ -748,7 +748,8 @@ label {
             }
             </script>
 
-            <button class="botao" type="submit">
+            <button class="botao" type="submit"
+onclick="return confirm('Confira atentamente os dados antes de registrar.\n\nDeseja realmente registrar este recebimento?');">
                 REGISTRAR RECEBIMENTO
             </button>
         <div id="avisoOffline" style="display:none;margin-top:14px;padding:12px;border-radius:10px;background:#fff3cd;font-weight:bold;text-align:center;"></div>
@@ -3534,6 +3535,9 @@ def registrar():
     offline_id = request.form.get("offline_id", "").strip() or None
     funcionario = session.get("usuario", "")
     observacao = request.form["observacao"].strip()
+
+    if not observacao:
+        return "ERRO: A observação é obrigatória. Volte e preencha a observação.", 400
 
     volumes = request.form["volumes"].strip()
 
