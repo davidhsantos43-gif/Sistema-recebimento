@@ -532,82 +532,92 @@ label {
         <h1>Controle de Recebimentos</h1>
 
 {% if session.get("nivel") == "admin" %}
-<a href="/usuarios"
-   style="display:flex;align-items:center;justify-content:center;
-   width:100%;min-height:54px;
-   background:#111827;color:white;
-   padding:14px 18px;border-radius:9px;
-   text-decoration:none;margin:18px 0 22px;
-   font-weight:bold;font-size:16px;
-   border:1px solid rgba(255,255,255,.18);
-   box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
-    GERENCIAR USUÁRIOS
-</a>
+<button type="button"
+        onclick="abrirMenuAdmin()"
+        style="position:fixed;right:18px;bottom:22px;width:62px;height:62px;
+               border:none;border-radius:50%;background:#111827;color:white;
+               font-size:28px;z-index:99998;box-shadow:0 5px 18px rgba(0,0,0,.35);
+               cursor:pointer;">
+    ⚙️
+</button>
 
-{% if session.get("usuario") == "ADMIN" %}
-<a href="/configuracoes"
-   style="display:flex;align-items:center;justify-content:center;
-   width:100%;min-height:54px;background:#111827;color:white;
-   padding:14px 18px;border-radius:9px;text-decoration:none;
-   margin:0 0 22px;font-weight:bold;font-size:16px;">
-    ⚙️ CONFIGURAÇÕES
-</a>
+<div id="menu-admin-flutuante"
+     onclick="if(event.target===this) fecharMenuAdmin()"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+            z-index:99999;padding:20px;align-items:center;justify-content:center;">
+
+    <div style="background:white;color:#111827;width:100%;max-width:430px;
+                border-radius:18px;padding:22px;max-height:85vh;overflow:auto;
+                box-shadow:0 12px 35px rgba(0,0,0,.35);">
+
+        <div style="display:flex;justify-content:space-between;align-items:center;
+                    margin-bottom:18px;">
+            <div style="font-size:22px;font-weight:800;">⚙️ Administração</div>
+
+            <button type="button"
+                    onclick="fecharMenuAdmin()"
+                    style="border:none;background:#f3f4f6;border-radius:10px;
+                           width:42px;height:42px;font-size:20px;">
+                ✕
+            </button>
+        </div>
+
+        <a href="/usuarios" style="display:block;padding:16px;margin-bottom:10px;
+           background:#111827;color:white;text-decoration:none;border-radius:10px;
+           text-align:center;font-weight:bold;">
+            👥 GERENCIAR USUÁRIOS
+        </a>
+
+        <a href="/configuracoes" style="display:block;padding:16px;margin-bottom:10px;
+           background:#111827;color:white;text-decoration:none;border-radius:10px;
+           text-align:center;font-weight:bold;">
+            ⚙️ CONFIGURAÇÕES
+        </a>
+
+        <a href="/logs" style="display:block;padding:16px;margin-bottom:10px;
+           background:#111827;color:white;text-decoration:none;border-radius:10px;
+           text-align:center;font-weight:bold;">
+            📋 LOGS DO SISTEMA
+        </a>
+
+        <a href="/observacoes" style="display:block;padding:16px;margin-bottom:10px;
+           background:#111827;color:white;text-decoration:none;border-radius:10px;
+           text-align:center;font-weight:bold;">
+            📝 GERENCIAR OBSERVAÇÕES
+        </a>
+
+        <a href="/assistente" style="display:block;padding:16px;margin-bottom:10px;
+           background:#111827;color:white;text-decoration:none;border-radius:10px;
+           text-align:center;font-weight:bold;">
+            🤖 ASSISTENTE
+        </a>
+
+        <a href="/relatorios" style="display:block;padding:16px;
+           background:#111827;color:white;text-decoration:none;border-radius:10px;
+           text-align:center;font-weight:bold;">
+            📦 RELATÓRIOS E BACKUPS
+        </a>
+
+    </div>
+</div>
+
+<script>
+function abrirMenuAdmin() {
+    const menu = document.getElementById("menu-admin-flutuante");
+    menu.style.display = "flex";
+    document.body.style.overflow = "hidden";
+}
+
+function fecharMenuAdmin() {
+    const menu = document.getElementById("menu-admin-flutuante");
+    menu.style.display = "none";
+    document.body.style.overflow = "";
+}
+</script>
 {% endif %}
 
-{% if pode_ver_logs() %}
-<a href="/logs"
-   style="display:flex;align-items:center;justify-content:center;
-   width:100%;min-height:54px;
-   background:#111827;color:white;
-   padding:14px 18px;border-radius:9px;
-   text-decoration:none;margin:0 0 22px;
-   font-weight:bold;font-size:16px;
-   border:1px solid rgba(255,255,255,.18);
-   box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
-    LOGS DO SISTEMA
-</a>
-{% endif %}
 
-<a href="/observacoes"
-   style="display:flex;align-items:center;justify-content:center;
-   width:100%;min-height:54px;
-   background:#111827;color:white;
-   padding:14px 18px;border-radius:9px;
-   text-decoration:none;margin:0 0 22px;
-   font-weight:bold;font-size:16px;
-   border:1px solid rgba(255,255,255,.18);
-   box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
-    GERENCIAR OBSERVAÇÕES
-</a>
-{% endif %}
-
-<a href="/assistente"
-   style="display:flex;align-items:center;justify-content:center;
-          width:100%;min-height:54px;
-          background:#111827;color:white;
-          padding:14px 18px;border-radius:9px;
-          text-decoration:none;margin:0 0 22px;
-          font-weight:bold;font-size:16px;
-          border:1px solid rgba(255,255,255,.18);
-          box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
-    🤖 ASSISTENTE
-</a>
-
-{% if session.get("usuario") in ("ADMIN", "GELOMAQ") %}
-<a href="/relatorios"
-   style="display:flex;align-items:center;justify-content:center;
-          width:100%;min-height:54px;
-          background:#111827;color:white;
-          padding:14px 18px;border-radius:9px;
-          text-decoration:none;margin:0 0 22px;
-          font-weight:bold;font-size:16px;
-          border:1px solid rgba(255,255,255,.18);
-          box-shadow:0 3px 0 rgba(0,0,0,.30),0 6px 14px rgba(0,0,0,.16);">
-    📦 RELATÓRIOS E BACKUPS
-</a>
-{% endif %}
-
-        <p>Registro e acompanhamento de entregas</p>
+<p>Registro e acompanhamento de entregas</p>
     </div>
 </div>
 
