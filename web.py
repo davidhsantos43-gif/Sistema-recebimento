@@ -3536,13 +3536,24 @@ def registrar():
     funcionario = session.get("usuario", "")
     observacao = request.form["observacao"].strip()
 
+    if not fornecedor:
+        return "ERRO: O fornecedor é obrigatório.", 400
+
+    if not nota_fiscal:
+        return "ERRO: A nota fiscal é obrigatória.", 400
+
     if not observacao:
         return "ERRO: A observação é obrigatória. Volte e preencha a observação.", 400
 
     volumes = request.form["volumes"].strip()
 
     if volumes:
-        volumes = int(volumes)
+        try:
+            volumes = int(volumes)
+            if volumes <= 0:
+                return "ERRO: A quantidade de volumes deve ser maior que zero.", 400
+        except ValueError:
+            return "ERRO: Informe uma quantidade de volumes válida.", 400
     else:
         volumes = None
 
