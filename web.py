@@ -748,10 +748,76 @@ label {
             }
             </script>
 
-            <button class="botao" type="submit"
-onclick="return confirm('Confira atentamente os dados antes de registrar.\n\nDeseja realmente registrar este recebimento?');">
-                REGISTRAR RECEBIMENTO
-            </button>
+                <button class="botao" type="button" onclick="abrirConfirmacao()">
+                    CONFERIR E REGISTRAR
+                </button>
+
+                <div id="modal-confirmacao" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;align-items:center;justify-content:center;padding:20px;">
+                    <div style="background:white;width:100%;max-width:480px;border-radius:16px;padding:22px;max-height:85vh;overflow:auto;">
+                        <h2>⚠️ Conferir recebimento</h2>
+                        <div id="resumo-confirmacao" style="line-height:1.8;margin:18px 0;"></div>
+
+                        <p><strong>Confira atentamente antes de confirmar.</strong></p>
+
+                        <div style="display:flex;gap:10px;">
+                            <button type="button" onclick="fecharConfirmacao()" style="flex:1;padding:12px;">
+                                VOLTAR
+                            </button>
+
+                            <button type="button" class="botao" onclick="confirmarRecebimento()" style="flex:1;">
+                                CONFIRMAR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                function pegar(nome) {
+                    const c = document.querySelector('#form-recebimento [name="' + nome + '"]');
+                    return c ? c.value.trim() : '';
+                }
+
+                function seguro(texto) {
+                    const d = document.createElement('div');
+                    d.textContent = texto || '-';
+                    return d.innerHTML;
+                }
+
+                function abrirConfirmacao() {
+                    const form = document.getElementById('form-recebimento');
+
+                    if (!form.checkValidity()) {
+                        form.reportValidity();
+                        return;
+                    }
+
+                    const campos = [
+                        ['Fornecedor', 'fornecedor'],
+                        ['Nota Fiscal', 'nota_fiscal'],
+                        ['Data da NF', 'data_nf'],
+                        ['Volumes', 'volumes'],
+                        ['Observação', 'observacao']
+                    ];
+
+                    let html = '';
+
+                    campos.forEach(function(c) {
+                        html += '<div><strong>' + c[0] + ':</strong> ' +
+                                seguro(pegar(c[1])) + '</div>';
+                    });
+
+                    document.getElementById('resumo-confirmacao').innerHTML = html;
+                    document.getElementById('modal-confirmacao').style.display = 'flex';
+                }
+
+                function fecharConfirmacao() {
+                    document.getElementById('modal-confirmacao').style.display = 'none';
+                }
+
+                function confirmarRecebimento() {
+                    document.getElementById('form-recebimento').submit();
+                }
+                </script>
         <div id="avisoOffline" style="display:none;margin-top:14px;padding:12px;border-radius:10px;background:#fff3cd;font-weight:bold;text-align:center;"></div>
         </form>
     </div>
