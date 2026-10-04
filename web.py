@@ -3545,6 +3545,14 @@ def registrar():
     if not observacao:
         return "ERRO: A observação é obrigatória. Volte e preencha a observação.", 400
 
+    if not data_nf:
+        return "ERRO: A data da Nota Fiscal é obrigatória.", 400
+
+    try:
+        datetime.strptime(data_nf, "%Y-%m-%d")
+    except ValueError:
+        return "ERRO: Data da Nota Fiscal inválida.", 400
+
     volumes = request.form["volumes"].strip()
 
     if volumes:
@@ -3776,7 +3784,12 @@ button {
 <strong>Recebido por:</strong> {{ registro['funcionario'] }}<br>
 {% endif %}
 
-            <strong>Data:</strong> {{ registro['data'] }} às {{ registro['hora'] }}
+            {% if session.get("usuario") == "ADMIN" %}
+<label>Data do recebimento</label>
+<input type="date" name="data_recebimento" value="{{ datetime.strptime(registro['data'], '%d/%m/%Y').strftime('%Y-%m-%d') }}">
+{% else %}
+<strong>Data:</strong> {{ registro['data'] }} às {{ registro['hora'] }}
+{% endif %}
 
         </div>
 
@@ -3824,9 +3837,43 @@ def editar_recebimento(id):
 
         nota_fiscal = request.form.get("nota_fiscal", "").strip()
 
+        if not fornecedor:
+            banco.close()
+            return "ERRO: O fornecedor é obrigatório.", 400
+
+        if not nota_fiscal:
+            banco.close()
+            return "ERRO: A Nota Fiscal é obrigatória.", 400
+
         data_nf = request.form.get("data_nf", "").strip()
+        data_recebimento = request.form.get("data_recebimento", "").strip()
 
         observacao = request.form.get("observacao", "").strip()
+
+        if not observacao:
+            banco.close()
+            return "ERRO: A observação é obrigatória.", 400
+
+        if not data_nf:
+            banco.close()
+            return "ERRO: A data da Nota Fiscal é obrigatória.", 400
+
+        try:
+            datetime.strptime(data_nf, "%Y-%m-%d")
+        except ValueError:
+            banco.close()
+            return "ERRO: Data da Nota Fiscal inválida.", 400
+
+        if session.get("usuario") == "ADMIN" and data_recebimento:
+            try:
+                data_recebimento = datetime.strptime(
+                    data_recebimento, "%Y-%m-%d"
+                ).strftime("%d/%m/%Y")
+            except ValueError:
+                banco.close()
+                return "ERRO: Data do recebimento inválida.", 400
+        else:
+            data_recebimento = registro["data"]
 
         volumes_txt = request.form.get("volumes", "").strip()
 
@@ -3851,6 +3898,7 @@ def editar_recebimento(id):
                 nota_fiscal = ?,
                 data_nf = ?,
                 volumes = ?,
+                data = ?,
 
                 observacao = ?,
                 funcionario = ?
@@ -3859,7 +3907,7 @@ def editar_recebimento(id):
 
             """,
 
-            (fornecedor, nota_fiscal, data_nf, volumes, observacao, funcionario, id)
+            (fornecedor, nota_fiscal, data_nf, volumes, data_recebimento, observacao, funcionario, id)
 
         )
 
@@ -3880,6 +3928,11 @@ def editar_recebimento(id):
 
         if registro["volumes"] != volumes:
             alteracoes.append(f'Volumes: {registro["volumes"]} -> {volumes}')
+
+        if registro["data"] != data_recebimento:
+            alteracoes.append(
+                f'Data do recebimento: {registro["data"]} -> {data_recebimento}'
+            )
 
         if registro["observacao"] != observacao:
             alteracoes.append(f'Observação: {registro["observacao"]} -> {observacao}')
@@ -3902,7 +3955,7 @@ def editar_recebimento(id):
 
         EDITAR_HTML,
 
-        registro=registro
+        registro=registro, datetime=datetime
 
     )
 
