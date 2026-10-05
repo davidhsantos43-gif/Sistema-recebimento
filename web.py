@@ -597,7 +597,7 @@ label {
 
 <div class="topo">
     <div class="container">
-        <h1>Controle de Recebimentos</h1>
+        <h1>{{ nome_sistema }}</h1>
 
 {% if session.get("nivel") == "admin" %}
 <button type="button"
@@ -685,7 +685,7 @@ function fecharMenuAdmin() {
 {% endif %}
 
 
-<p>Registro e acompanhamento de entregas</p>
+<p>{{ subtitulo_sistema }}</p>
     </div>
 </div>
 
@@ -920,6 +920,25 @@ function fecharMenuAdmin() {
 
     {% endif %}
 
+<div class="card">
+<h2>🔎 Filtrar histórico</h2>
+<form method="GET" action="/">
+<input name="fornecedor" value="{{ fornecedor }}" placeholder="Fornecedor">
+<input name="nf" value="{{ nf }}" placeholder="Nota fiscal">
+<input name="funcionario" value="{{ funcionario }}" placeholder="Recebido por">
+<select name="status">
+<option value="">Todas as conferências</option>
+<option value="pendente" {% if status == "pendente" %}selected{% endif %}>Pendente</option>
+<option value="conferido" {% if status == "conferido" %}selected{% endif %}>Conferido</option>
+</select>
+<label>Data inicial</label>
+<input type="date" name="data_inicio" value="{{ data_inicio }}">
+<label>Data final</label>
+<input type="date" name="data_fim" value="{{ data_fim }}">
+<button class="botao" type="submit">FILTRAR</button>
+<a href="/" class="botao">LIMPAR FILTROS</a>
+</form>
+</div>
     <div class="card historico-card">
 
         {% if filtro or pesquisa %}
@@ -3606,6 +3625,13 @@ def toggle_observacao(id):
 def inicio():
     pesquisa = request.args.get("q", "").strip()
     filtro = request.args.get("filtro", "").strip()
+    fornecedor = request.args.get("fornecedor", "").strip()
+    nf = request.args.get("nf", "").strip()
+    funcionario = request.args.get("funcionario", "").strip()
+    status = request.args.get("status", "").strip()
+    data_inicio = request.args.get("data_inicio", "").strip()
+    data_fim = request.args.get("data_fim", "").strip()
+    filtro_avancado = any([fornecedor, nf, funcionario, status, data_inicio, data_fim])
 
     banco = conectar()
 
@@ -3616,7 +3642,36 @@ def inicio():
         ORDER BY texto
     """).fetchall()
 
-    if filtro == "hoje":
+    if filtro_avancado:
+        sql = "SELECT * FROM recebimentos WHERE 1=1"
+        params = []
+
+        if fornecedor:
+            sql += " AND fornecedor ILIKE ?"
+            params.append(f"%{fornecedor}%")
+
+        if nf:
+            sql += " AND nota_fiscal ILIKE ?"
+            params.append(f"%{nf}%")
+        if funcionario:
+            sql += " AND funcionario ILIKE ?"
+            params.append(f"%{funcionario}%")
+
+        if status == "pendente":
+            sql += " AND conferido = 0"
+        elif status == "conferido":
+            sql += " AND conferido = 1"
+        if data_inicio:
+            sql += " AND TO_DATE(data, 'DD/MM/YYYY') >= ?::date"
+            params.append(data_inicio)
+
+        if data_fim:
+            sql += " AND TO_DATE(data, 'DD/MM/YYYY') <= ?::date"
+            params.append(data_fim)
+        sql += " ORDER BY id DESC"
+        registros = banco.execute(sql, tuple(params)).fetchall()
+
+    elif filtro == "hoje":
         registros = banco.execute(
             """
             SELECT *
@@ -3725,6 +3780,12 @@ def inicio():
         HTML,
         registros=registros,
         pesquisa=pesquisa,
+        fornecedor=fornecedor,
+        nf=nf,
+        funcionario=funcionario,
+        status=status,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
         sugestoes=sugestoes,
         filtro=filtro,
         total_hoje=total_hoje,
