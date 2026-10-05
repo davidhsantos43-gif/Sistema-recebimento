@@ -922,7 +922,7 @@ function fecharMenuAdmin() {
 
 <div class="card">
 <h2>🔎 Filtrar histórico</h2>
-<form method="GET" action="/">
+<form method="GET" action="/?ir=historico">
 <input name="fornecedor" value="{{ fornecedor }}" placeholder="Fornecedor">
 <input name="nf" value="{{ nf }}" placeholder="Nota fiscal">
 <input name="funcionario" value="{{ funcionario }}" placeholder="Recebido por">
@@ -936,10 +936,17 @@ function fecharMenuAdmin() {
 <label>Data final</label>
 <input type="date" name="data_fim" value="{{ data_fim }}">
 <button class="botao" type="submit">FILTRAR</button>
-<a href="/" class="botao">LIMPAR FILTROS</a>
+<a href="/?ir=historico" class="botao">LIMPAR FILTROS</a>
 </form>
 </div>
-    <div class="card historico-card">
+{% if request.args.get("ir") == "historico" %}
+<script>
+window.addEventListener("load", function(){
+document.getElementById("historico").scrollIntoView();
+});
+</script>
+{% endif %}
+    <div id="historico" class="card historico-card">
 
         {% if filtro or pesquisa %}
         <style>
